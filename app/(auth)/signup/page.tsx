@@ -45,7 +45,12 @@ export default function SignUpPage() {
       });
 
       if (result.error) {
-        setError(result.error.message || 'Failed to create account');
+        console.error('Signup error:', result.error);
+        // Show more detailed error in development
+        const errorMessage = process.env.NODE_ENV === 'development' 
+          ? result.error.message || JSON.stringify(result.error)
+          : result.error.message || 'Failed to create account';
+        setError(errorMessage);
         setIsLoading(false);
         return;
       }
@@ -53,7 +58,12 @@ export default function SignUpPage() {
       // Redirect to organization creation page
       router.push('/dashboard/create-organization');
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      console.error('Signup exception:', err);
+      // Show more detailed error in development
+      const errorMessage = process.env.NODE_ENV === 'development' && err instanceof Error
+        ? err.message
+        : 'An error occurred. Please try again.';
+      setError(errorMessage);
       setIsLoading(false);
     }
   };

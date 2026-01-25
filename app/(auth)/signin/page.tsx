@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { signIn } from '@/lib/auth-client';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { signIn, useSession } from '@/lib/auth-client';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -13,10 +13,20 @@ import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 
 export default function SignInPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { data: session } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Redirect if already signed in
+  useEffect(() => {
+    if (session?.user) {
+      const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+      window.location.href = callbackUrl;
+    }
+  }, [session, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,9 +45,15 @@ export default function SignInPage() {
         return;
       }
 
-      router.push('/dashboard');
+      // Get callback URL from query params, or default to dashboard
+      const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+      
+      // Use window.location.href instead of router.push to ensure cookies are read
+      // This forces a full page reload which ensures the middleware can read the session cookie
+      window.location.href = callbackUrl;
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      console.error('Signin error:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred. Please try again.');
       setIsLoading(false);
     }
   };
