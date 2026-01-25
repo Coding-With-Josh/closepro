@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { signIn, useSession } from '@/lib/auth-client';
+import { useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { signIn } from '@/lib/auth-client';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -12,21 +12,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 
 function SignInForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: session } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  // Redirect if already signed in
-  useEffect(() => {
-    if (session?.user) {
-      const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
-      window.location.href = callbackUrl;
-    }
-  }, [session, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
