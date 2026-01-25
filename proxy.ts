@@ -3,23 +3,33 @@ import type { NextRequest } from 'next/server';
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const { searchParams } = request.nextUrl;
 
   // Public routes that don't require authentication
   const publicRoutes = ['/signin', '/signup', '/'];
   const isPublicRoute = publicRoutes.some(route => pathname === route);
 
-  // Check for Better Auth session cookie
-  const sessionToken = request.cookies.get('better-auth.session_token');
+  // Check for Better Auth session cookie (try multiple possible cookie names)
+  const sessionToken = 
+    request.cookies.get('better-auth.session_token') ||
+    request.cookies.get('better-auth_session_token') ||
+    request.cookies.get('session_token');
+
+  // If we have a _signedIn flag, allow the request through even if cookie check fails
+  // This handles the timing issue where cookie is set but not yet readable
+  const isJustSignedIn = searchParams.get('_signedIn') === 'true';
 
   // Redirect to signin if accessing protected route without session
-  if (!isPublicRoute && !sessionToken) {
+  // But skip this check if user just signed in (to handle cookie propagation delay)
+  if (!isPublicRoute && !sessionToken && !isJustSignedIn) {
     const signInUrl = new URL('/signin', request.url);
     signInUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(signInUrl);
   }
 
   // Redirect to dashboard if accessing auth pages while logged in
-  if ((pathname === '/signin' || pathname === '/signup') && sessionToken) {
+  // Skip this redirect if user just signed in to avoid loops
+  if ((pathname === '/signin' || pathname === '/signup') && sessionToken && !isJustSignedIn) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 

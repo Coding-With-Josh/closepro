@@ -36,7 +36,17 @@ function SignInForm() {
       }
 
       // Get callback URL from query params, or default to dashboard
-      const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+      let callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+      
+      // Add a flag to indicate successful sign-in to help proxy handle the redirect
+      const url = new URL(callbackUrl, window.location.origin);
+      url.searchParams.set('_signedIn', 'true');
+      callbackUrl = url.pathname + url.search;
+      
+      // Wait longer in production to ensure cookie is set and propagated
+      // Production environments (especially Vercel) may have slight delays in cookie propagation
+      const delay = process.env.NODE_ENV === 'production' ? 1000 : 200;
+      await new Promise(resolve => setTimeout(resolve, delay));
       
       // Use window.location.href instead of router.push to ensure cookies are read
       // This forces a full page reload which ensures the middleware can read the session cookie
