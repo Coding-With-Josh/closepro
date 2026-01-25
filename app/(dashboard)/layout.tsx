@@ -24,6 +24,7 @@ export default function DashboardLayout({
 
   useEffect(() => {
     // Check if user has organizations (skip on create-org page)
+    // Note: We don't force redirect - users can join organizations instead of creating one
     const checkOrganizations = async () => {
       if (isCreateOrgPage) return;
 
@@ -31,9 +32,11 @@ export default function DashboardLayout({
         const response = await fetch('/api/organizations/list');
         if (response.ok) {
           const data = await response.json();
-          // If user has no organizations, redirect to create-organization
-          if (!data.organizations || data.organizations.length === 0) {
-            window.location.href = '/dashboard/create-organization';
+          // Only redirect if user has no organizations AND is on the main dashboard
+          // This allows users to join organizations via other means
+          if ((!data.organizations || data.organizations.length === 0) && pathname === '/dashboard') {
+            // Show a prompt or allow them to stay - don't force redirect
+            // Users can manually navigate to create-organization if needed
           }
         }
       } catch (error) {
@@ -44,7 +47,7 @@ export default function DashboardLayout({
     if (session?.user) {
       checkOrganizations();
     }
-  }, [session, isCreateOrgPage]);
+  }, [session, isCreateOrgPage, pathname]);
 
   // Use cached user data, fallback to session data
   const userName = user?.name || session?.user?.name || 'User';

@@ -9,6 +9,11 @@ export async function proxy(request: NextRequest) {
   const publicRoutes = ['/signin', '/signup', '/'];
   const isPublicRoute = publicRoutes.some(route => pathname === route);
 
+  // Special routes that handle their own authentication checks
+  // These pages check for session client-side, so we allow them through
+  const selfAuthRoutes = ['/dashboard/create-organization', '/dashboard/pricing'];
+  const isSelfAuthRoute = selfAuthRoutes.some(route => pathname === route);
+
   // Check for Better Auth session cookie (try multiple possible cookie names)
   const sessionToken = 
     request.cookies.get('better-auth.session_token') ||
@@ -20,8 +25,10 @@ export async function proxy(request: NextRequest) {
   const isJustSignedIn = searchParams.get('_signedIn') === 'true';
 
   // Redirect to signin if accessing protected route without session
-  // But skip this check if user just signed in (to handle cookie propagation delay)
-  if (!isPublicRoute && !sessionToken && !isJustSignedIn) {
+  // But skip this check if:
+  // 1. User just signed in (to handle cookie propagation delay)
+  // 2. It's a self-auth route (page handles its own auth check)
+  if (!isPublicRoute && !isSelfAuthRoute && !sessionToken && !isJustSignedIn) {
     const signInUrl = new URL('/signin', request.url);
     signInUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(signInUrl);
