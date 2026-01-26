@@ -62,6 +62,11 @@ const navSections: NavSection[] = [
         href: '/dashboard/performance',
         icon: BarChart3,
       },
+      {
+        title: 'Figures',
+        href: '/dashboard/performance/figures',
+        icon: BarChart3,
+      },
     ],
   },
   {
@@ -69,6 +74,11 @@ const navSections: NavSection[] = [
     items: [
       {
         title: 'Call Analysis',
+        href: '/dashboard/calls/review',
+        icon: Mic,
+      },
+      {
+        title: 'Live Call Reporting',
         href: '/dashboard/calls',
         icon: Mic,
       },

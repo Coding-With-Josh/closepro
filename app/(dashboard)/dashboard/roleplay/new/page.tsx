@@ -7,8 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Loader2, FileText } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 interface Offer {
@@ -21,34 +20,23 @@ interface ProspectAvatar {
   id: string;
   name: string;
   difficultyTier: string;
+  sourceType: 'manual' | 'transcript_derived';
 }
 
-interface SalesCall {
-  id: string;
-  fileName: string;
-  transcript: string;
-}
 
 export default function NewRoleplayPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<'manual' | 'transcript_replay'>('manual');
   const [offers, setOffers] = useState<Offer[]>([]);
   const [avatars, setAvatars] = useState<ProspectAvatar[]>([]);
-  const [calls, setCalls] = useState<SalesCall[]>([]);
   const [selectedOfferId, setSelectedOfferId] = useState<string>('');
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>('');
-  const [selectedCallId, setSelectedCallId] = useState<string>('');
   const [difficulty, setDifficulty] = useState<string>('intermediate');
-  const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
 
   useEffect(() => {
     fetchOffers();
     fetchAvatars();
-    if (mode === 'transcript_replay') {
-      fetchCalls();
-    }
-  }, [mode]);
+  }, []);
 
   const fetchOffers = async () => {
     try {
@@ -86,30 +74,9 @@ export default function NewRoleplayPage() {
     }
   };
 
-  const fetchCalls = async () => {
-    try {
-      const response = await fetch('/api/calls');
-      if (response.ok) {
-        const data = await response.json();
-        // Filter calls with transcripts
-        const callsWithTranscripts = (data.calls || []).filter(
-          (call: SalesCall) => call.transcript
-        );
-        setCalls(callsWithTranscripts);
-      }
-    } catch (error) {
-      console.error('Error fetching calls:', error);
-    }
-  };
-
   const handleStart = async () => {
     if (!selectedOfferId) {
       alert('Please select an offer');
-      return;
-    }
-
-    if (mode === 'transcript_replay' && !selectedCallId) {
-      alert('Please select a call to replay');
       return;
     }
 
@@ -118,33 +85,12 @@ export default function NewRoleplayPage() {
       let sessionData: any = {
         offerId: selectedOfferId === 'default' ? 'default' : selectedOfferId,
         selectedDifficulty: difficulty,
-        inputMode,
-        mode,
+        inputMode: 'voice', // Fixed to voice only
+        mode: 'manual', // Fixed to manual/Ai Voice Roleplay
       };
 
       if (selectedAvatarId) {
         sessionData.prospectAvatarId = selectedAvatarId;
-      }
-
-      if (mode === 'transcript_replay' && selectedCallId) {
-        sessionData.sourceCallId = selectedCallId;
-        
-        // Extract prospect from transcript first
-        try {
-          const extractResponse = await fetch('/api/roleplay/extract-prospect', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ callId: selectedCallId }),
-          });
-
-          if (extractResponse.ok) {
-            const extractData = await extractResponse.json();
-            sessionData.prospectAvatarId = extractData.avatar.id;
-          }
-        } catch (error) {
-          console.error('Error extracting prospect:', error);
-          // Continue anyway - will use difficulty selection
-        }
       }
 
       const response = await fetch('/api/roleplay', {
@@ -177,52 +123,7 @@ export default function NewRoleplayPage() {
       </div>
 
       <Card className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-        {/* Mode Selection */}
-        <div className="space-y-2">
-          <Label>Roleplay Mode</Label>
-          <Select value={mode} onValueChange={(v) => setMode(v as 'manual' | 'transcript_replay')}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="manual">Manual Roleplay</SelectItem>
-              <SelectItem value="transcript_replay">Replay from Transcript</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-sm text-muted-foreground">
-            {mode === 'manual' 
-              ? 'Practice with a custom prospect'
-              : 'Replay a real call to practice handling the same prospect'}
-          </p>
-        </div>
-
-        {/* Transcript Selection (for replay mode) */}
-        {mode === 'transcript_replay' && (
-          <div className="space-y-2">
-            <Label>Select Call to Replay</Label>
-            <Select value={selectedCallId} onValueChange={setSelectedCallId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a call" />
-              </SelectTrigger>
-              <SelectContent>
-                {calls.length === 0 ? (
-                  <SelectItem value="" disabled>No calls with transcripts available</SelectItem>
-                ) : (
-                  calls.map((call) => (
-                    <SelectItem key={call.id} value={call.id}>
-                      {call.fileName}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              The AI will extract the prospect profile from this call
-            </p>
-          </div>
-        )}
-
-        {/* Offer Selection */}
+        {/* Offer Selection - First */}
         <div className="space-y-2">
           <Label>Offer</Label>
           <Select value={selectedOfferId} onValueChange={setSelectedOfferId}>
@@ -249,31 +150,36 @@ export default function NewRoleplayPage() {
           ) : null}
         </div>
 
-        {/* Prospect Avatar Selection (optional, for manual mode) */}
-        {mode === 'manual' && avatars.length > 0 && (
-          <div className="space-y-2">
-            <Label>Prospect Avatar (Optional)</Label>
-            <Select value={selectedAvatarId} onValueChange={setSelectedAvatarId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Use default or select avatar" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Default (based on difficulty)</SelectItem>
-                {avatars.map((avatar) => (
-                  <SelectItem key={avatar.id} value={avatar.id}>
-                    {avatar.name} ({avatar.difficultyTier})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              Use a saved prospect profile, or let AI generate one based on difficulty
+        {/* Prospect Avatar Selection - Second (NEW) */}
+        <div className="space-y-2">
+          <Label>Pick the Prospect</Label>
+          <Select value={selectedAvatarId} onValueChange={setSelectedAvatarId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select a prospect avatar" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Create New Prospect</SelectItem>
+              {avatars.map((avatar) => (
+                <SelectItem key={avatar.id} value={avatar.id}>
+                  {avatar.name} ({avatar.difficultyTier})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-sm text-muted-foreground">
+            Select from your saved prospect avatars, or create a new one
+          </p>
+          {avatars.length === 0 && (
+            <p className="text-sm text-orange-500 mt-1">
+              <Link href="/dashboard/prospect-avatars/new" className="underline">
+                Create a prospect avatar
+              </Link> to use in roleplays
             </p>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Difficulty Selection (for manual mode or if no avatar selected) */}
-        {mode === 'manual' && (
+        {/* Difficulty Selection - Third (only if manual prospect, not from previous lead/transcript) */}
+        {(!selectedAvatarId || (selectedAvatarId && avatars.find(a => a.id === selectedAvatarId)?.sourceType === 'manual')) && (
           <div className="space-y-2">
             <Label>Difficulty Level</Label>
             <Select value={difficulty} onValueChange={setDifficulty}>
@@ -282,31 +188,30 @@ export default function NewRoleplayPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="easy">Easy - Open and cooperative</SelectItem>
-                <SelectItem value="intermediate">Intermediate - Realistic challenge</SelectItem>
+                <SelectItem value="intermediate">Realistic - Intermediate challenge</SelectItem>
                 <SelectItem value="hard">Hard - Guarded and skeptical</SelectItem>
-                <SelectItem value="expert">Expert - Elite level difficulty</SelectItem>
+                <SelectItem value="expert">Elite - Expert level difficulty</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground">
-              How difficult the prospect should be (if not using a saved avatar)
+              How difficult the prospect should be (only for manually created prospects, not from mp3 or transcript)
             </p>
           </div>
         )}
 
-        {/* Input Mode */}
+        {/* Roleplay Mode - Fourth (fixed to Ai Voice Roleplay) */}
         <div className="space-y-2">
-          <Label>Input Mode</Label>
-          <Select value={inputMode} onValueChange={(v) => setInputMode(v as 'text' | 'voice')}>
+          <Label>Roleplay Mode</Label>
+          <Select value="manual" disabled>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="text">Text Chat</SelectItem>
-              <SelectItem value="voice">Voice Chat</SelectItem>
+              <SelectItem value="manual">Ai Voice Roleplay</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-sm text-muted-foreground">
-            How you'll communicate during the roleplay
+            Practice with an AI prospect using voice interaction
           </p>
         </div>
 

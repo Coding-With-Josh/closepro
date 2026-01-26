@@ -297,68 +297,97 @@ export default function PerformancePage() {
         </CardContent>
       </Card>
 
-      {/* Pillar Scores */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className={`border-2 ${getScoreBg(performance.averageValue)}`}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              <CardTitle className="text-sm font-semibold">Value</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className={`text-3xl font-bold ${getScoreColor(performance.averageValue)}`}>
-              {performance.averageValue}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">Communication score</p>
-          </CardContent>
-        </Card>
+      {/* Sales Fundamental Metrics */}
+      <div>
+        <h2 className="text-xl font-semibold mb-2">Sales Fundamental Metrics</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Overall metrics for calls on (closer/lead)
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className={`border-2 ${getScoreBg(performance.averageValue)}`}>
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" />
+                <CardTitle className="text-sm font-semibold">Value</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className={`text-3xl font-bold ${getScoreColor(performance.averageValue)}`}>
+                {performance.averageValue}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Communication score</p>
+            </CardContent>
+          </Card>
 
-        <Card className={`border-2 ${getScoreBg(performance.averageTrust)}`}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
-              <CardTitle className="text-sm font-semibold">Trust</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className={`text-3xl font-bold ${getScoreColor(performance.averageTrust)}`}>
-              {performance.averageTrust}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">Building score</p>
-          </CardContent>
-        </Card>
+          <Card className={`border-2 ${getScoreBg(performance.averageTrust)}`}>
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                <CardTitle className="text-sm font-semibold">Trust</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className={`text-3xl font-bold ${getScoreColor(performance.averageTrust)}`}>
+                {performance.averageTrust}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Building score</p>
+            </CardContent>
+          </Card>
 
-        <Card className={`border-2 ${getScoreBg(performance.averageFit)}`}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-primary" />
-              <CardTitle className="text-sm font-semibold">Fit</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className={`text-3xl font-bold ${getScoreColor(performance.averageFit)}`}>
-              {performance.averageFit}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">Confirmation score</p>
-          </CardContent>
-        </Card>
+          <Card className={`border-2 ${getScoreBg(performance.averageFit)}`}>
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-primary" />
+                <CardTitle className="text-sm font-semibold">Fit</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className={`text-3xl font-bold ${getScoreColor(performance.averageFit)}`}>
+                {performance.averageFit}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Confirmation score</p>
+            </CardContent>
+          </Card>
 
-        <Card className={`border-2 ${getScoreBg(performance.averageLogistics)}`}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Truck className="h-5 w-5 text-primary" />
-              <CardTitle className="text-sm font-semibold">Logistics</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className={`text-3xl font-bold ${getScoreColor(performance.averageLogistics)}`}>
-              {performance.averageLogistics}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">Handling score</p>
-          </CardContent>
-        </Card>
+          <Card className={`border-2 ${getScoreBg(performance.averageLogistics)}`}>
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Truck className="h-5 w-5 text-primary" />
+                <CardTitle className="text-sm font-semibold">Logistics</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className={`text-3xl font-bold ${getScoreColor(performance.averageLogistics)}`}>
+                {performance.averageLogistics}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Handling score</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      {/* 10 Skill Categories */}
+      {performance.skillCategories.length > 0 && (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Skill Categories</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {performance.skillCategories.slice(0, 10).map((skill, idx) => (
+              <Card key={idx} className={`border-2 ${getScoreBg(skill.averageScore)}`}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold truncate" title={skill.category}>
+                    {skill.category}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className={`text-2xl font-bold ${getScoreColor(skill.averageScore)}`}>
+                    {skill.averageScore}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Strengths & Weaknesses */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CreditCard, TrendingUp, TrendingDown, Minus, Phone, Bot, Target, Shield, Package, Truck, Loader2, ArrowRight, Upload, Play, BarChart3, Lightbulb } from 'lucide-react';
+import { CreditCard, TrendingUp, TrendingDown, Minus, Phone, Bot, Loader2, ArrowRight, Upload, Play, BarChart3, Lightbulb } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/contexts/user-context';
 
@@ -188,6 +188,9 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground">
               {performance?.totalCalls || 0} calls, {performance?.totalRoleplays || 0} roleplays
             </p>
+            <p className="text-xs text-muted-foreground/70 mt-1 italic">
+              Combined total of analyzed calls and practice sessions
+            </p>
           </CardContent>
         </Card>
 
@@ -201,67 +204,13 @@ export default function DashboardPage() {
               {performance?.totalRoleplays || 0}
             </div>
             <p className="text-xs text-muted-foreground">AI roleplay sessions</p>
+            <p className="text-xs text-muted-foreground/70 mt-1 italic">
+              Interactive practice sessions with AI prospects
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Pillar Performance */}
-      {performance && (
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Target className="h-4 w-4 text-primary" />
-                <CardTitle className="text-sm font-semibold">Value</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${getScoreColor(performance.averageValue)}`}>
-                {performance.averageValue}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-primary" />
-                <CardTitle className="text-sm font-semibold">Trust</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${getScoreColor(performance.averageTrust)}`}>
-                {performance.averageTrust}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Package className="h-4 w-4 text-primary" />
-                <CardTitle className="text-sm font-semibold">Fit</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${getScoreColor(performance.averageFit)}`}>
-                {performance.averageFit}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Truck className="h-4 w-4 text-primary" />
-                <CardTitle className="text-sm font-semibold">Logistics</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${getScoreColor(performance.averageLogistics)}`}>
-                {performance.averageLogistics}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* Recent Activity & Quick Actions - Side by Side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
