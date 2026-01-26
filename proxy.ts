@@ -14,18 +14,24 @@ export async function proxy(request: NextRequest) {
   const isSelfAuthRoute = selfAuthRoutes.some(route => pathname === route);
 
   // Check for Better Auth session cookie
-  // Better Auth uses 'better-auth.session_token' as the default cookie name
-  const sessionToken = request.cookies.get('better-auth.session_token');
+  // Better Auth uses 'better-auth.session_token' as the cookie name
+  // Also check alternative cookie names in case of configuration differences
+  const sessionToken = 
+    request.cookies.get('better-auth.session_token') ||
+    request.cookies.get('better-auth_session_token') ||
+    request.cookies.get('session_token');
+
+  const hasSession = !!sessionToken;
 
   // Redirect to signin if accessing protected route without session
-  if (!isPublicRoute && !isSelfAuthRoute && !sessionToken) {
+  if (!isPublicRoute && !isSelfAuthRoute && !hasSession) {
     const signInUrl = new URL('/signin', request.url);
     signInUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(signInUrl);
   }
 
   // Redirect to dashboard if accessing auth pages while logged in
-  if ((pathname === '/signin' || pathname === '/signup') && sessionToken) {
+  if ((pathname === '/signin' || pathname === '/signup') && hasSession) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 

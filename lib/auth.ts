@@ -37,8 +37,9 @@ export const auth = betterAuth({
   advanced: {
     // Cookie configuration for production
     // Better Auth automatically sets httpOnly and secure in production
-    // We just need to ensure proper configuration
     useSecureCookies: process.env.NODE_ENV === 'production',
+    // Ensure cookies work across the entire domain
+    cookiePrefix: 'better-auth',
   },
 });
 

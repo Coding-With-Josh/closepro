@@ -38,6 +38,10 @@ function SignInForm() {
       // Get callback URL from query params, or default to dashboard
       const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
       
+      // Small delay to ensure cookie is set by Better Auth before redirect
+      // This is critical for the proxy to detect the session
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Use window.location.href to force a full page reload
       // This ensures the cookie is properly set and the proxy can read it
       window.location.href = callbackUrl;
