@@ -23,30 +23,11 @@ function SignInForm() {
     setError('');
     setIsLoading(true);
 
-    // #region agent log
-    console.log('[DEBUG] Sign-in form submitted', {email: email.substring(0,3)+'***', timestamp: Date.now()});
-    // #endregion
-
     try {
       const result = await signIn.email({
         email,
         password,
       });
-
-      // #region agent log
-      console.log('[DEBUG] Sign-in API response', {hasError: !!result.error, errorMessage: result.error?.message, hasData: !!result.data, fullResult: result, timestamp: Date.now()});
-      // #endregion
-
-      // #region agent log
-      // Check ALL cookies, not just session/auth ones
-      const allCookiesRaw = document.cookie;
-      const allCookies = document.cookie.split(';').reduce((acc, cookie) => {
-        const [name, value] = cookie.trim().split('=');
-        acc[name] = value?.substring(0, 20) + '...';
-        return acc;
-      }, {} as Record<string, string>);
-      console.log('[DEBUG] ALL cookies after sign-in API call', {cookieString: allCookiesRaw, cookieCount: Object.keys(allCookies).length, cookies: allCookies, timestamp: Date.now()});
-      // #endregion
 
       if (result.error) {
         setError(result.error.message || 'Invalid email or password');
@@ -54,33 +35,33 @@ function SignInForm() {
         return;
       }
 
-      // Get callback URL from query params, or default to dashboard
-      const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
-      
-      // #region agent log
-      console.log('[DEBUG] Before delay and redirect', {callbackUrl, delayMs: 300, timestamp: Date.now()});
-      // #endregion
-      
       // Small delay to ensure cookie is set by Better Auth before redirect
       // This is critical for the proxy to detect the session
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      // #region agent log
-      const cookiesAfterDelay = document.cookie.split(';').reduce((acc, cookie) => {
-        const [name, value] = cookie.trim().split('=');
-        if (name.includes('session') || name.includes('auth')) acc[name] = value?.substring(0, 20) + '...';
-        return acc;
-      }, {} as Record<string, string>);
-      console.log('[DEBUG] Cookies after delay, before redirect', {cookieCount: Object.keys(cookiesAfterDelay).length, cookies: cookiesAfterDelay, redirectingTo: callbackUrl, timestamp: Date.now()});
-      // #endregion
+      // Check if user has organizations before redirecting
+      // If no organizations, redirect to create-organization instead of dashboard
+      try {
+        const orgResponse = await fetch('/api/organizations/list');
+        if (orgResponse.ok) {
+          const orgData = await orgResponse.json();
+          if (!orgData.organizations || orgData.organizations.length === 0) {
+            // User has no organizations - redirect to create-organization
+            window.location.href = '/dashboard/create-organization';
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking organizations:', error);
+        // On error, redirect to create-organization to be safe
+        window.location.href = '/dashboard/create-organization';
+        return;
+      }
       
-      // Use window.location.href to force a full page reload
-      // This ensures the cookie is properly set and the proxy can read it
+      // User has organizations - redirect to requested URL or dashboard
+      const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
       window.location.href = callbackUrl;
     } catch (err) {
-      // #region agent log
-      console.log('[DEBUG] Sign-in exception caught', {errorMessage: err instanceof Error ? err.message : String(err), timestamp: Date.now()});
-      // #endregion
       console.error('Signin error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred. Please try again.');
       setIsLoading(false);
