@@ -103,13 +103,7 @@ const navSections: NavSection[] = [
         title: 'Team Performance',
         href: '/dashboard/team',
         icon: Users,
-      },
-      {
-        title: 'Analytics',
-        href: '/dashboard/analytics',
-        icon: BarChart3,
-        badge: 'Beta',
-      },
+      }
     ],
   },
   {
