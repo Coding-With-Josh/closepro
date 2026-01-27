@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, TrendingUp, Target, Users, Package } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface Analysis {
   id: string;
@@ -70,6 +71,7 @@ export default function RoleplayResultsPage() {
         return;
       }
 
+      
       if (data.session.status === 'completed' && !data.session.analysisId) {
         // Session completed but not scored yet — score it now
         const scoreResponse = await fetch(`/api/roleplay/${sessionId}/score`, {
@@ -457,7 +459,16 @@ export default function RoleplayResultsPage() {
           <h2 className="text-xl font-semibold mb-4">3-5 Prioritized Fixes</h2>
           <div className="space-y-3">
             {recommendations.slice(0, 5).map((rec: any, i: number) => (
-              <div key={i} className="border-l-4 border-primary pl-4">
+              <div 
+                key={i} 
+                className="border-l-4 border-primary pl-4 hover:bg-muted/50 rounded-r-lg p-2 transition-colors cursor-pointer"
+                onClick={() => {
+                  if (rec.timestamp) {
+                    // Navigate to session page with timestamp to jump to that moment
+                    router.push(`/dashboard/roleplay/${sessionId}?timestamp=${rec.timestamp}`);
+                  }
+                }}
+              >
                 <div className="flex items-center gap-2 mb-1">
                   <Badge
                     variant={
@@ -471,10 +482,85 @@ export default function RoleplayResultsPage() {
                     {rec.priority}
                   </Badge>
                   <span className="font-medium">{rec.category}</span>
+                  {rec.timestamp && (
+                    <Badge variant="outline" className="ml-auto text-xs">
+                      {Math.floor(rec.timestamp / 1000 / 60)}:{(Math.floor(rec.timestamp / 1000) % 60).toString().padStart(2, '0')}
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground mb-1">{rec.issue}</p>
+                {rec.explanation && (
+                  <p className="text-xs text-muted-foreground mb-1">{rec.explanation}</p>
+                )}
                 {rec.action && (
                   <p className="text-sm font-medium">{rec.action}</p>
+                )}
+                {rec.transcriptSegment && (
+                  <div className="mt-2 p-2 bg-muted rounded text-xs text-muted-foreground">
+                    "{rec.transcriptSegment}"
+                  </div>
+                )}
+                {rec.timestamp && (
+                  <p className="text-xs text-primary mt-2">
+                    Click to jump to this moment in the call
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Timestamped Feedback */}
+      {parsedTimestampedFeedback.length > 0 && (
+        <Card className="p-4 sm:p-6">
+          <h2 className="text-xl font-semibold mb-4">Moment-by-Moment Feedback</h2>
+          <div className="space-y-3">
+            {parsedTimestampedFeedback.slice(0, 10).map((feedback: any, i: number) => (
+              <div
+                key={i}
+                className={`border-l-4 pl-4 p-2 rounded-r-lg transition-colors cursor-pointer hover:bg-muted/50 ${
+                  feedback.type === 'strength' ? 'border-green-500' :
+                  feedback.type === 'weakness' ? 'border-red-500' :
+                  feedback.type === 'opportunity' ? 'border-blue-500' :
+                  'border-yellow-500'
+                }`}
+                onClick={() => {
+                  if (feedback.timestamp) {
+                    router.push(`/dashboard/roleplay/${sessionId}?timestamp=${feedback.timestamp}`);
+                  }
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge
+                    variant={
+                      feedback.type === 'strength' ? 'default' :
+                      feedback.type === 'weakness' ? 'destructive' :
+                      feedback.type === 'opportunity' ? 'secondary' :
+                      'outline'
+                    }
+                  >
+                    {feedback.type}
+                  </Badge>
+                  {feedback.pillar && (
+                    <Badge variant="outline">{feedback.pillar}</Badge>
+                  )}
+                  {feedback.timestamp && (
+                    <Badge variant="outline" className="ml-auto text-xs">
+                      {Math.floor(feedback.timestamp / 1000 / 60)}:{(Math.floor(feedback.timestamp / 1000) % 60).toString().padStart(2, '0')}
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm font-medium mb-1">{feedback.message}</p>
+                {feedback.transcriptSegment && (
+                  <div className="mt-2 p-2 bg-muted rounded text-xs text-muted-foreground">
+                    "{feedback.transcriptSegment}"
+                  </div>
+                )}
+                {feedback.timestamp && (
+                  <p className="text-xs text-primary mt-2">
+                    Click to jump to this moment • <Link href={`/dashboard/roleplay/new?offerId=${session?.prospectAvatar?.offerId || ''}&rerunFrom=${feedback.timestamp}`} className="underline">Rerun from here</Link>
+                  </p>
                 )}
               </div>
             ))}

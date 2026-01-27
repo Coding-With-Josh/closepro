@@ -17,6 +17,7 @@ interface Offer {
   isTemplate: boolean;
   isActive: boolean;
   createdAt: string;
+  prospectCount?: number;
 }
 
 export default function OffersPage() {
@@ -124,27 +125,38 @@ export default function OffersPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {offers.map((offer) => (
             <Card key={offer.id} className="p-6 hover:shadow-lg transition-shadow">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-lg mb-2">{offer.name}</h3>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    <Badge variant="outline">{getCategoryLabel(offer.offerCategory)}</Badge>
-                    <Badge variant="secondary">{getDeliveryLabel(offer.deliveryModel)}</Badge>
-                    {offer.isTemplate && (
-                      <Badge variant="default">Template</Badge>
+              <Link href={`/dashboard/offers/${offer.id}`}>
+                <div className="flex items-start justify-between mb-4 cursor-pointer">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg mb-2">{offer.name}</h3>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      <Badge variant="outline">{getCategoryLabel(offer.offerCategory)}</Badge>
+                      <Badge variant="secondary">{getDeliveryLabel(offer.deliveryModel)}</Badge>
+                      {offer.isTemplate && (
+                        <Badge variant="default">Template</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Price: {offer.priceRange}
+                    </p>
+                    {offer.prospectCount !== undefined && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {offer.prospectCount} prospect{offer.prospectCount !== 1 ? 's' : ''}
+                      </p>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Price: {offer.priceRange}
-                  </p>
                 </div>
-              </div>
+              </Link>
 
               <div className="flex gap-2 pt-4 border-t">
-                <Link href={`/dashboard/offers/${offer.id}/edit`} className="flex-1">
-                  <Button variant="outline" size="sm" className="w-full">
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
+                <Link href={`/dashboard/offers/${offer.id}`} className="flex-1">
+                  <Button variant="default" size="sm" className="w-full">
+                    View Prospects
+                  </Button>
+                </Link>
+                <Link href={`/dashboard/offers/${offer.id}/edit`}>
+                  <Button variant="outline" size="sm">
+                    <Edit className="h-4 w-4" />
                   </Button>
                 </Link>
                 <Button

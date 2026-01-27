@@ -8,6 +8,13 @@
       "when": 1769144010608,
       "tag": "0000_add_roleplay_analysis",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1769532266897,
+      "tag": "0001_calm_blackheart",
+      "breakpoints": true
     }
   ]
 }

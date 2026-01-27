@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,7 @@ interface UserProfile {
 export default function RoleplaySessionPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const sessionId = params.sessionId as string;
 
   const [session, setSession] = useState<Session | null>(null);
@@ -58,6 +59,25 @@ export default function RoleplaySessionPage() {
     fetchSession();
     fetchUserProfile();
     initializeVoice();
+    
+    // Handle timestamp navigation from feedback clicks
+    const timestamp = searchParams?.get('timestamp');
+    if (timestamp) {
+      const timestampMs = parseInt(timestamp);
+      setTimeout(() => {
+        // Scroll to message at or near this timestamp
+        const messageElement = document.querySelector(`[data-timestamp="${timestampMs}"]`);
+        if (messageElement) {
+          messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Highlight the message briefly
+          messageElement.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
+          setTimeout(() => {
+            messageElement.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
+          }, 3000);
+        }
+      }, 500);
+    }
+    
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
@@ -66,7 +86,7 @@ export default function RoleplaySessionPage() {
         clearTimeout(activeSpeakerTimeoutRef.current);
       }
     };
-  }, [sessionId]);
+  }, [sessionId, searchParams]);
 
   const fetchUserProfile = async () => {
     try {
@@ -421,7 +441,11 @@ export default function RoleplaySessionPage() {
                 </div>
               ) : (
                 messages.map((msg, idx) => (
-                  <div key={idx} className="space-y-1">
+                  <div 
+                    key={idx} 
+                    className="space-y-1"
+                    data-timestamp={msg.timestamp || idx * 5000}
+                  >
                     <div className="flex items-center gap-2">
                       <span className={cn(
                         "font-semibold text-sm",

@@ -107,6 +107,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get offerId from form data or request body
+    let offerId: string | null = null;
+    if (contentType.includes('multipart/form-data')) {
+      const offerIdForm = formData.get('offerId') as string | null;
+      offerId = offerIdForm;
+    } else {
+      const body = await request.json().catch(() => ({}));
+      offerId = body.offerId || null;
+    }
+
+    if (!offerId) {
+      return NextResponse.json(
+        { error: 'offerId is required. All prospects must belong to an offer.' },
+        { status: 400 }
+      );
+    }
+
+    // Verify offer exists and user has access
+    const offer = await db
+      .select()
+      .from(offers)
+      .where(eq(offers.id, offerId))
+      .limit(1);
+
+    if (!offer[0]) {
+      return NextResponse.json(
+        { error: 'Offer not found' },
+        { status: 404 }
+      );
+    }
+
     // Get user's primary organization
     const user = await db
       .select()
@@ -138,6 +169,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'No organization found' },
         { status: 400 }
+      );
+    }
+
+    // Verify user has access to the offer
+    const userOrgIds = userOrg.map(uo => uo.organizationId);
+    if (!userOrgIds.includes(offer[0].organizationId)) {
+      return NextResponse.json(
+        { error: 'Access denied to this offer' },
+        { status: 403 }
       );
     }
 
@@ -224,7 +264,8 @@ Return ONLY valid JSON, no markdown formatting.`;
     const [newAvatar] = await db
       .insert(prospectAvatars)
       .values({
-        organizationId,
+        organizationId: offer[0].organizationId,
+        offerId: offerId,
         userId: session.user.id,
         name: extracted.positionDescription 
           ? `Prospect: ${extracted.positionDescription.substring(0, 50)}`

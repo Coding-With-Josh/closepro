@@ -322,9 +322,10 @@ export const offers = pgTable('offers', {
 export const prospectAvatars = pgTable('prospect_avatars', {
   id: uuid('id').defaultRandom().primaryKey(),
   organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  offerId: uuid('offer_id').notNull().references(() => offers.id, { onDelete: 'cascade' }), // All prospects belong to an offer
   userId: text('user_id').references(() => users.id, { onDelete: 'set null' }), // Creator (optional for org-wide)
   name: text('name').notNull(), // Avatar name/description
-  sourceType: text('source_type').notNull().default('manual'), // 'manual', 'transcript_derived'
+  sourceType: text('source_type').notNull().default('manual'), // 'manual', 'transcript_derived', 'auto_generated'
   sourceTranscriptId: uuid('source_transcript_id').references(() => salesCalls.id, { onDelete: 'set null' }),
   
   // 50-Point Difficulty Model (Layer 2)
@@ -456,6 +457,7 @@ export const offersRelations = relations(offers, ({ one, many }) => ({
     fields: [offers.userId],
     references: [users.id],
   }),
+  prospects: many(prospectAvatars),
   roleplaySessions: many(roleplaySessions),
 }));
 
@@ -463,6 +465,10 @@ export const prospectAvatarsRelations = relations(prospectAvatars, ({ one, many 
   organization: one(organizations, {
     fields: [prospectAvatars.organizationId],
     references: [organizations.id],
+  }),
+  offer: one(offers, {
+    fields: [prospectAvatars.offerId],
+    references: [offers.id],
   }),
   user: one(users, {
     fields: [prospectAvatars.userId],

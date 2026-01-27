@@ -93,11 +93,6 @@ const navSections: NavSection[] = [
         href: '/dashboard/offers',
         icon: Target,
       },
-      {
-        title: 'Prospect Avatars',
-        href: '/dashboard/prospect-avatars',
-        icon: Users,
-      },
     ],
   },
   {

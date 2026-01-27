@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,16 @@ import { calculateDifficultyIndex } from '@/lib/ai/roleplay/prospect-avatar';
 
 export default function NewProspectAvatarPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const offerId = searchParams?.get('offerId');
   const [loading, setLoading] = useState(false);
+  
+  // Redirect if accessed directly - prospects must be created within offers
+  useEffect(() => {
+    if (!offerId) {
+      router.push('/dashboard/offers');
+    }
+  }, [offerId, router]);
   // Helper to map High/Medium/Low to 1-10
   const mapLevelToScore = (level: 'high' | 'medium' | 'low'): number => {
     switch (level) {
@@ -103,10 +112,17 @@ export default function NewProspectAvatarPage() {
         executionResistance = executionResistanceMap[formData.executionResistance] || 5;
       }
 
+      if (!offerId) {
+        alert('Offer ID is required. Please create prospects from within an offer.');
+        router.push('/dashboard/offers');
+        return;
+      }
+
       const response = await fetch('/api/prospect-avatars', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          offerId: offerId,
           name: formData.name,
           positionProblemAlignment,
           painAmbitionIntensity,
@@ -124,7 +140,7 @@ export default function NewProspectAvatarPage() {
         throw new Error(error.error || 'Failed to create avatar');
       }
 
-      router.push('/dashboard/prospect-avatars');
+      router.push(`/dashboard/offers/${offerId}`);
     } catch (error: any) {
       console.error('Error creating avatar:', error);
       alert('Failed to create avatar: ' + error.message);
@@ -136,12 +152,14 @@ export default function NewProspectAvatarPage() {
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-4xl">
       <div className="mb-4 sm:mb-6">
-        <Link href="/dashboard/prospect-avatars">
-          <Button variant="ghost" size="sm" className="mb-2">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Avatars
-          </Button>
-        </Link>
+        {offerId && (
+          <Link href={`/dashboard/offers/${offerId}`}>
+            <Button variant="ghost" size="sm" className="mb-2">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Offer
+            </Button>
+          </Link>
+        )}
         <h1 className="text-2xl sm:text-3xl font-bold">Create Prospect Avatar</h1>
         <p className="text-sm sm:text-base text-muted-foreground mt-1">
           Define a prospect profile for roleplay training
@@ -389,11 +407,19 @@ export default function NewProspectAvatarPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
-            <Link href="/dashboard/prospect-avatars" className="flex-1">
-              <Button type="button" variant="outline" className="w-full">
-                Cancel
-              </Button>
-            </Link>
+            {offerId ? (
+              <Link href={`/dashboard/offers/${offerId}`} className="flex-1">
+                <Button type="button" variant="outline" className="w-full">
+                  Cancel
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/dashboard/offers" className="flex-1">
+                <Button type="button" variant="outline" className="w-full">
+                  Cancel
+                </Button>
+              </Link>
+            )}
             <Button type="submit" disabled={loading} className="flex-1 w-full sm:w-auto">
               {loading ? (
                 <>

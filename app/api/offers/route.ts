@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { db } from '@/db';
-import { offers } from '@/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { offers, prospectAvatars } from '@/db/schema';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import { users, organizations, userOrganizations } from '@/db/schema';
 import { validateOfferProfile, getOfferTemplates, OFFER_TEMPLATES } from '@/lib/ai/roleplay/offer-intelligence';
 
@@ -76,9 +76,25 @@ export async function GET(request: NextRequest) {
 
     const orgIds = userOrgs.map(uo => uo.organizationId);
 
-    // Get all offers for user's organizations
+    // Get all offers for user's organizations with prospect counts
     const offersList = await db
-      .select()
+      .select({
+        id: offers.id,
+        name: offers.name,
+        offerCategory: offers.offerCategory,
+        priceRange: offers.priceRange,
+        deliveryModel: offers.deliveryModel,
+        isTemplate: offers.isTemplate,
+        isActive: offers.isActive,
+        createdAt: offers.createdAt,
+        organizationId: offers.organizationId,
+        prospectCount: sql<number>`(
+          SELECT COUNT(*)::int
+          FROM ${prospectAvatars}
+          WHERE ${prospectAvatars.offerId} = ${offers.id}
+          AND ${prospectAvatars.isActive} = true
+        )`,
+      })
       .from(offers)
       .where(
         and(
@@ -134,6 +150,7 @@ export async function POST(request: NextRequest) {
       priceRange,
       paymentOptions,
       timeToResult,
+      timePerWeek,
       effortRequired,
       primaryProblemsSolved,
       emotionalDrivers,
@@ -141,11 +158,14 @@ export async function POST(request: NextRequest) {
       proofAssetsAvailable,
       proofRelevanceNotes,
       riskReversal,
+      riskReversalDetails,
       commonSkepticismTriggers,
+      downsellOptions,
       mustHaveConditions,
       disqualifiers,
       softDisqualifiers,
       bestFitNotes,
+      funnelContext,
       isTemplate = false,
     } = body;
 
@@ -231,7 +251,7 @@ export async function POST(request: NextRequest) {
         mustHaveConditions: mustHaveConditions ? JSON.stringify(mustHaveConditions) : null,
         disqualifiers: disqualifiers ? JSON.stringify(disqualifiers) : null,
         softDisqualifiers: softDisqualifiers ? JSON.stringify(softDisqualifiers) : null,
-        bestFitNotes,
+        bestFitNotes: bestFitNotes || (downsellOptions && downsellOptions.length > 0 ? JSON.stringify({ downsellOptions, riskReversalDetails }) : null),
         isTemplate,
         isActive: true,
       })

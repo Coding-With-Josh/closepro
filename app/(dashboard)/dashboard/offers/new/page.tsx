@@ -32,6 +32,8 @@ export default function NewOfferPage() {
     commonObjections: [''],
     funnelContext: '',
     paymentOptions: { payInFull: true, paymentPlans: [] },
+    downsellOptions: [''],
+    riskReversalDetails: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,6 +61,7 @@ export default function NewOfferPage() {
           ...formData,
           primaryProblemsSolved: problems,
           commonSkepticismTriggers: formData.commonObjections.filter(o => o.trim()),
+          downsellOptions: formData.downsellOptions.filter(o => o.trim()),
         }),
       });
 
@@ -384,6 +387,37 @@ export default function NewOfferPage() {
               onClick={() => setFormData({ ...formData, commonObjections: [...formData.commonObjections, ''] })}
             >
               Add Another Objection
+            </Button>
+          </div>
+
+          {/* Down Sell Options */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">Down Sell Options</h2>
+            <p className="text-sm text-muted-foreground">
+              Alternative offers or payment plans available if prospect can't commit to main offer
+            </p>
+            
+            {formData.downsellOptions.map((option, index) => (
+              <div key={index} className="space-y-2">
+                <Label>Down Sell Option {index + 1}</Label>
+                <Input
+                  value={option}
+                  onChange={(e) => {
+                    const updated = [...formData.downsellOptions];
+                    updated[index] = e.target.value;
+                    setFormData({ ...formData, downsellOptions: updated });
+                  }}
+                  placeholder="e.g., Payment plan: 3 installments of $3,333"
+                />
+              </div>
+            ))}
+            
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setFormData({ ...formData, downsellOptions: [...formData.downsellOptions, ''] })}
+            >
+              Add Another Down Sell Option
             </Button>
           </div>
 

@@ -68,8 +68,16 @@ export default function NewRoleplayPage() {
   useEffect(() => {
     fetchTemplates();
     fetchOffers();
-    fetchAvatars();
   }, []);
+
+  useEffect(() => {
+    // Fetch prospects when offer is selected
+    if (selectedOfferId) {
+      fetchAvatarsForOffer(selectedOfferId);
+    } else {
+      setAvatars([]);
+    }
+  }, [selectedOfferId]);
 
   const fetchTemplates = async () => {
     try {
@@ -95,9 +103,9 @@ export default function NewRoleplayPage() {
     }
   };
 
-  const fetchAvatars = async () => {
+  const fetchAvatarsForOffer = async (offerId: string) => {
     try {
-      const response = await fetch('/api/prospect-avatars');
+      const response = await fetch(`/api/prospect-avatars?offerId=${offerId}`);
       if (response.ok) {
         const data = await response.json();
         setAvatars(data.avatars || []);
@@ -417,18 +425,18 @@ export default function NewRoleplayPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
-                  Select from your saved prospect avatars, or create a new one below
+                  Select from prospects created for this offer, or create a new one
                 </p>
                 <div className="flex gap-2">
-                  <Link href="/dashboard/prospect-avatars/new">
+                  <Link href={`/dashboard/offers/${selectedOfferId}/prospects/new`}>
                     <Button variant="outline" size="sm" type="button">
-                      Create New Prospect Avatar
+                      Create New Prospect
                     </Button>
                   </Link>
                 </div>
                 {avatars.length === 0 && (
                   <p className="text-sm text-orange-500 mt-2">
-                    No saved avatars yet. Click the button above to create one.
+                    No prospects yet for this offer. Click the button above to create one, or visit the offer page to auto-generate prospects.
                   </p>
                 )}
               </div>

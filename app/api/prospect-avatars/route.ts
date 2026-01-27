@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { db } from '@/db';
-import { prospectAvatars } from '@/db/schema';
+import { prospectAvatars, offers } from '@/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { users, userOrganizations } from '@/db/schema';
 import { calculateDifficultyIndex, mapDifficultySelectionToProfile } from '@/lib/ai/roleplay/prospect-avatar';
 
 /**
- * GET - List all prospect avatars for user's organization
+ * GET - List all prospect avatars for a specific offer
+ * Requires offerId query parameter
  */
 export async function GET(request: NextRequest) {
   try {
@@ -23,37 +24,58 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user's organizations
-    const userOrgs = await db
-      .select()
-      .from(userOrganizations)
-      .where(eq(userOrganizations.userId, session.user.id));
+    const { searchParams } = new URL(request.url);
+    const offerId = searchParams.get('offerId');
 
-    const orgIds = userOrgs.map(uo => uo.organizationId);
-
-    if (orgIds.length === 0) {
-      return NextResponse.json({ avatars: [] });
+    if (!offerId) {
+      return NextResponse.json(
+        { error: 'offerId query parameter is required' },
+        { status: 400 }
+      );
     }
 
-    // Get all avatars for user's organizations
+    // Verify offer exists and user has access
+    const offer = await db
+      .select()
+      .from(offers)
+      .where(eq(offers.id, offerId))
+      .limit(1);
+
+    if (!offer[0]) {
+      return NextResponse.json(
+        { error: 'Offer not found' },
+        { status: 404 }
+      );
+    }
+
+    const userOrg = await db
+      .select()
+      .from(userOrganizations)
+      .where(eq(userOrganizations.userId, session.user.id))
+      .limit(1);
+
+    const userOrgIds = userOrg.map(uo => uo.organizationId);
+    if (!userOrgIds.includes(offer[0].organizationId)) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      );
+    }
+
+    // Get all avatars for this offer
     const avatarsList = await db
       .select()
       .from(prospectAvatars)
       .where(
         and(
-          orgIds.length > 0 ? eq(prospectAvatars.organizationId, orgIds[0]) : undefined,
+          eq(prospectAvatars.offerId, offerId),
           eq(prospectAvatars.isActive, true)
         )
       )
       .orderBy(desc(prospectAvatars.createdAt));
 
-    // Filter by organization IDs if multiple
-    const filteredAvatars = orgIds.length > 1
-      ? avatarsList.filter(a => orgIds.includes(a.organizationId))
-      : avatarsList;
-
     return NextResponse.json({
-      avatars: filteredAvatars,
+      avatars: avatarsList,
     });
   } catch (error: any) {
     console.error('Error fetching prospect avatars:', error);
@@ -161,7 +183,8 @@ export async function POST(request: NextRequest) {
     const [newAvatar] = await db
       .insert(prospectAvatars)
       .values({
-        organizationId,
+        organizationId: offer[0].organizationId,
+        offerId: offerId,
         userId: session.user.id,
         name,
         sourceType,
