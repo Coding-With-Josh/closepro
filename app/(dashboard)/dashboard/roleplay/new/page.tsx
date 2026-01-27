@@ -236,13 +236,18 @@ export default function NewRoleplayPage() {
     try {
       let sessionData: any = {
         offerId: selectedOfferId,
-        selectedDifficulty: difficulty,
         inputMode: 'voice', // Fixed to voice only
         mode: prospectSelectionMode === 'transcript' ? 'transcript_replay' : 'manual',
       };
 
-      if (selectedAvatarId) {
+      // Add difficulty or avatar based on selection mode
+      if (prospectSelectionMode === 'difficulty') {
+        sessionData.selectedDifficulty = difficulty;
+      } else if (prospectSelectionMode === 'manual' && selectedAvatarId) {
         sessionData.prospectAvatarId = selectedAvatarId;
+      } else if (prospectSelectionMode === 'manual' && !selectedAvatarId) {
+        // If manual mode but no avatar selected, use difficulty preset
+        sessionData.selectedDifficulty = difficulty;
       }
 
       const response = await fetch('/api/roleplay', {
@@ -266,7 +271,9 @@ export default function NewRoleplayPage() {
   };
 
   const canProceedToProspect = selectedOfferId && offerSelectionMode !== null;
-  const canStart = canProceedToProspect && (prospectSelectionMode !== null || selectedAvatarId) && prospectSelectionMode !== 'transcript';
+  const canStart = canProceedToProspect && 
+    prospectSelectionMode !== null && 
+    prospectSelectionMode !== 'transcript';
 
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-4xl">
@@ -395,27 +402,22 @@ export default function NewRoleplayPage() {
             <TabsContent value="manual" className="space-y-4 mt-4">
               <div className="space-y-2">
                 <Label>Select Saved Prospect Avatar</Label>
-                <Select value={selectedAvatarId} onValueChange={setSelectedAvatarId}>
+                <Select value={selectedAvatarId || undefined} onValueChange={setSelectedAvatarId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a prospect avatar" />
+                    <SelectValue placeholder="Select a prospect avatar or create new" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Create New Prospect</SelectItem>
                     {Array.isArray(avatars) && avatars.length > 0 ? (
                       avatars.map((avatar) => (
                         <SelectItem key={avatar.id} value={avatar.id}>
                           {avatar.name} ({avatar.difficultyTier || 'unknown'})
                         </SelectItem>
                       ))
-                    ) : (
-                      <SelectItem value="" disabled>
-                        No saved avatars yet
-                      </SelectItem>
-                    )}
+                    ) : null}
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
-                  Select from your saved prospect avatars, or create a new one
+                  Select from your saved prospect avatars, or create a new one below
                 </p>
                 <div className="flex gap-2">
                   <Link href="/dashboard/prospect-avatars/new">
@@ -424,6 +426,11 @@ export default function NewRoleplayPage() {
                     </Button>
                   </Link>
                 </div>
+                {avatars.length === 0 && (
+                  <p className="text-sm text-orange-500 mt-2">
+                    No saved avatars yet. Click the button above to create one.
+                  </p>
+                )}
               </div>
             </TabsContent>
 
