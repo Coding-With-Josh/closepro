@@ -34,6 +34,7 @@ export default function NewProspectAvatarPage() {
     perceivedNeedForHelp: 'medium' as 'high' | 'medium' | 'low',
     authorityLevel: 'peer' as 'advisee' | 'peer' | 'advisor',
     funnelContext: 'warm_inbound',
+    executionResistance: 'medium' as 'fully_able' | 'partial' | 'extreme' | 'auto',
     positionDescription: '',
   });
 
@@ -88,6 +89,20 @@ export default function NewProspectAvatarPage() {
       };
       const funnelContext = funnelContextMap[formData.funnelContext] || 5;
 
+      // Map execution resistance
+      let executionResistance: number;
+      if (formData.executionResistance === 'auto') {
+        // Default to medium (5) - could be enhanced with offer-based calculation
+        executionResistance = 5;
+      } else {
+        const executionResistanceMap: Record<string, number> = {
+          'fully_able': 9, // 8-10 range, use 9 as midpoint
+          'partial': 6, // 5-7 range, use 6 as midpoint
+          'extreme': 2, // 1-4 range, use 2 as midpoint
+        };
+        executionResistance = executionResistanceMap[formData.executionResistance] || 5;
+      }
+
       const response = await fetch('/api/prospect-avatars', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -98,6 +113,7 @@ export default function NewProspectAvatarPage() {
           perceivedNeedForHelp,
           authorityLevel: formData.authorityLevel,
           funnelContext,
+          executionResistance,
           positionDescription: formData.positionDescription,
           problems: problems,
         }),
@@ -343,6 +359,30 @@ export default function NewProspectAvatarPage() {
                 </Select>
                 <p className="text-xs text-muted-foreground">
                   How did this prospect come onto the call?
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="executionResistance">Execution Resistance (Ability to Proceed)</Label>
+                <Select
+                  value={formData.executionResistance}
+                  onValueChange={(value: 'fully_able' | 'partial' | 'extreme' | 'auto') => 
+                    setFormData({ ...formData, executionResistance: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto-calculate (default)</SelectItem>
+                    <SelectItem value="fully_able">Fully Able (8-10) - Has money, time, authority</SelectItem>
+                    <SelectItem value="partial">Partial Ability (5-7) - Needs reprioritization</SelectItem>
+                    <SelectItem value="extreme">Extreme Resistance (1-4) - Severe constraints</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Measures whether the prospect has practical ability to act (money, time, effort capacity, decision authority). 
+                  This is logistical, not emotional.
                 </p>
               </div>
             </div>

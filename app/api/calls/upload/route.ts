@@ -171,6 +171,30 @@ async function analyzeCallAsync(
   try {
     const analysisResult = await analyzeCall(transcript, transcriptJson);
 
+    // Enhance coaching recommendations with execution resistance context if applicable
+    let enhancedRecommendations = [...(analysisResult.coachingRecommendations || [])];
+    if (analysisResult.prospectDifficulty?.executionResistance !== undefined) {
+      const execResistance = analysisResult.prospectDifficulty.executionResistance;
+      if (execResistance <= 4) {
+        // Add note about execution resistance
+        enhancedRecommendations.push({
+          priority: 'medium' as const,
+          category: 'Prospect Difficulty',
+          issue: `Prospect had extreme execution resistance (${execResistance}/10) - severe money/time/authority constraints`,
+          explanation: 'This call was difficult due to structural blockers, not just sales skill. Execution resistance increases difficulty but does not excuse poor performance - both should be addressed.',
+          action: 'Flag this as a lead quality issue. Consider qualifying for execution ability earlier in the funnel.',
+        });
+      } else if (execResistance <= 7) {
+        enhancedRecommendations.push({
+          priority: 'low' as const,
+          category: 'Prospect Difficulty',
+          issue: `Prospect had partial execution ability (${execResistance}/10)`,
+          explanation: 'Prospect may need payment plans, time restructuring, or prioritization reframing.',
+          action: 'Consider offering flexible payment options or helping prospect reprioritize.',
+        });
+      }
+    }
+
     // Save analysis to database
     await db
       .insert(callAnalysis)
@@ -186,7 +210,7 @@ async function analyzeCallAsync(
         fitDetails: JSON.stringify(analysisResult.fit),
         logisticsDetails: JSON.stringify(analysisResult.logistics),
         skillScores: JSON.stringify(analysisResult.skillScores),
-        coachingRecommendations: JSON.stringify(analysisResult.coachingRecommendations),
+        coachingRecommendations: JSON.stringify(enhancedRecommendations),
         timestampedFeedback: JSON.stringify(analysisResult.timestampedFeedback),
       });
 

@@ -1,18 +1,21 @@
-// Layer 2: Prospect Avatar & Difficulty Intelligence (40-Point Model)
+// Layer 2: Prospect Avatar & Difficulty Intelligence (50-Point Model)
 
 export type AuthorityLevel = 'advisee' | 'peer' | 'advisor';
 export type DifficultyTier = 'easy' | 'realistic' | 'hard' | 'elite' | 'near_impossible';
 
 export interface ProspectDifficultyProfile {
-  // 40-Point Model (4 dimensions × 10 points each)
+  // Layer A: Persuasion Difficulty (40 points)
   positionProblemAlignment: number; // 0-10
   painAmbitionIntensity: number; // 0-10
   perceivedNeedForHelp: number; // 0-10
   authorityLevel: AuthorityLevel;
-  funnelContext: number; // 0-10 (Layer 3)
+  funnelContext: number; // 0-10
+  
+  // Layer B: Execution Resistance (10 points)
+  executionResistance: number; // 0-10 (ability to proceed: money, time, effort, authority)
   
   // Calculated
-  difficultyIndex: number; // 0-40 (sum of first 4 dimensions)
+  difficultyIndex: number; // 0-50 (Layer A + Layer B)
   difficultyTier: DifficultyTier;
 }
 
@@ -38,14 +41,17 @@ export interface ProspectAvatar {
 }
 
 /**
- * Calculate difficulty index from dimensions
+ * Calculate difficulty index from dimensions (50-point model)
+ * Layer A (40 points): Persuasion Difficulty
+ * Layer B (10 points): Execution Resistance
  */
 export function calculateDifficultyIndex(
   positionProblemAlignment: number,
   painAmbitionIntensity: number,
   perceivedNeedForHelp: number,
   authorityLevel: AuthorityLevel,
-  funnelContext: number
+  funnelContext: number,
+  executionResistance: number = 5 // Default to medium ability
 ): { index: number; tier: DifficultyTier } {
   // Authority level contributes to perceivedNeedForHelp
   let authorityScore = perceivedNeedForHelp;
@@ -56,23 +62,29 @@ export function calculateDifficultyIndex(
   }
   // Advisee keeps full score
 
-  // Calculate index (first 4 dimensions, funnel context is separate but influences behaviour)
-  const index = Math.round(
+  // Calculate Layer A: Persuasion Difficulty (40 points)
+  const layerA = Math.round(
     positionProblemAlignment +
     painAmbitionIntensity +
     authorityScore +
     funnelContext
   );
 
-  // Determine tier
+  // Layer B: Execution Resistance (10 points)
+  const layerB = Math.max(0, Math.min(10, Math.round(executionResistance)));
+
+  // Total difficulty index (0-50)
+  const index = layerA + layerB;
+
+  // Determine tier based on 50-point scale
   let tier: DifficultyTier;
-  if (index >= 35) {
+  if (index >= 43) {
     tier = 'easy';
-  } else if (index >= 30) {
+  } else if (index >= 37) {
     tier = 'realistic';
-  } else if (index >= 25) {
+  } else if (index >= 31) {
     tier = 'hard';
-  } else if (index >= 20) {
+  } else if (index >= 25) {
     tier = 'elite';
   } else {
     tier = 'near_impossible';
@@ -82,7 +94,7 @@ export function calculateDifficultyIndex(
 }
 
 /**
- * Map user-selected difficulty to prospect profile ranges
+ * Map user-selected difficulty to prospect profile ranges (50-point scale)
  */
 export function mapDifficultySelectionToProfile(
   selectedDifficulty: 'easy' | 'realistic' | 'hard' | 'elite' | 'intermediate' | 'expert'
@@ -92,18 +104,94 @@ export function mapDifficultySelectionToProfile(
 } {
   switch (selectedDifficulty) {
     case 'easy':
-      return { targetIndexRange: [35, 40], targetTier: 'easy' };
+      return { targetIndexRange: [43, 50], targetTier: 'easy' };
     case 'realistic':
     case 'intermediate':
-      return { targetIndexRange: [30, 35], targetTier: 'realistic' };
+      return { targetIndexRange: [37, 43], targetTier: 'realistic' };
     case 'hard':
-      return { targetIndexRange: [25, 30], targetTier: 'hard' };
+      return { targetIndexRange: [31, 37], targetTier: 'hard' };
     case 'elite':
     case 'expert':
-      return { targetIndexRange: [20, 25], targetTier: 'elite' };
+      return { targetIndexRange: [25, 31], targetTier: 'elite' };
     default:
-      return { targetIndexRange: [30, 35], targetTier: 'realistic' };
+      return { targetIndexRange: [37, 43], targetTier: 'realistic' };
   }
+}
+
+/**
+ * Calculate Execution Resistance based on offer requirements and prospect profile
+ * Returns score 1-10 where higher = more able to proceed
+ * 
+ * @param offerPriceRange - Price range string like "5000-25000"
+ * @param offerEffortRequired - 'low' | 'medium' | 'high'
+ * @param prospectAuthorityLevel - Authority level affects decision-making ability
+ * @param prospectPainAmbitionIntensity - Higher motivation = more likely to find resources
+ * @returns Execution resistance score (1-10)
+ */
+export function calculateExecutionResistance(
+  offerPriceRange: string,
+  offerEffortRequired: 'low' | 'medium' | 'high' = 'medium',
+  prospectAuthorityLevel: AuthorityLevel = 'peer',
+  prospectPainAmbitionIntensity: number = 5
+): number {
+  let baseScore = 7; // Start with moderate ability
+
+  // Adjust based on price range
+  // Extract numeric range from string like "5000-25000"
+  const priceMatch = offerPriceRange.match(/(\d+)/g);
+  if (priceMatch && priceMatch.length >= 1) {
+    const minPrice = parseInt(priceMatch[0]);
+    const maxPrice = priceMatch.length > 1 ? parseInt(priceMatch[1]) : minPrice;
+    const avgPrice = (minPrice + maxPrice) / 2;
+    
+    // Higher price = lower ability score
+    if (avgPrice >= 20000) {
+      baseScore -= 2; // Very high ticket
+    } else if (avgPrice >= 10000) {
+      baseScore -= 1; // High ticket
+    } else if (avgPrice >= 5000) {
+      // Medium ticket, no change
+    } else {
+      baseScore += 1; // Lower ticket, easier to afford
+    }
+  }
+
+  // Adjust based on effort required
+  switch (offerEffortRequired) {
+    case 'high':
+      baseScore -= 1.5; // High effort = harder to commit time
+      break;
+    case 'medium':
+      baseScore -= 0.5;
+      break;
+    case 'low':
+      // Low effort, no penalty
+      break;
+  }
+
+  // Adjust based on authority level (decision-making ability)
+  switch (prospectAuthorityLevel) {
+    case 'advisor':
+      baseScore += 1; // Advisors typically have more resources/authority
+      break;
+    case 'peer':
+      // No change
+      break;
+    case 'advisee':
+      baseScore -= 0.5; // May have less decision authority
+      break;
+  }
+
+  // Adjust based on motivation (pain/ambition intensity)
+  // Higher motivation = more likely to find resources
+  if (prospectPainAmbitionIntensity >= 8) {
+    baseScore += 1; // High motivation can overcome constraints
+  } else if (prospectPainAmbitionIntensity <= 3) {
+    baseScore -= 1; // Low motivation = more excuses
+  }
+
+  // Clamp to 1-10 range
+  return Math.max(1, Math.min(10, Math.round(baseScore)));
 }
 
 /**
@@ -114,7 +202,7 @@ function randomInt(min: number, max: number): number {
 }
 
 /**
- * Generate a random prospect within a difficulty band
+ * Generate a random prospect within a difficulty band (50-point model)
  * Ensures total difficulty score falls within selected range
  */
 export function generateRandomProspectInBand(
@@ -125,18 +213,20 @@ export function generateRandomProspectInBand(
   perceivedNeedForHelp: number;
   authorityLevel: AuthorityLevel;
   funnelContext: number;
+  executionResistance: number;
   difficultyIndex: number;
   difficultyTier: DifficultyTier;
 } {
   const { targetIndexRange, targetTier } = mapDifficultySelectionToProfile(selectedDifficulty);
   const [minTotal, maxTotal] = targetIndexRange;
 
-  // Generate random scores that sum to within the target range
+  // Generate random scores that sum to within the target range (50-point scale)
   let positionProblemAlignment: number;
   let painAmbitionIntensity: number;
   let perceivedNeedForHelp: number;
   let authorityLevel: AuthorityLevel;
   let funnelContext: number;
+  let executionResistance: number;
   let total: number;
   let attempts = 0;
   const maxAttempts = 100;
@@ -147,6 +237,7 @@ export function generateRandomProspectInBand(
     painAmbitionIntensity = randomInt(1, 10);
     perceivedNeedForHelp = randomInt(1, 10);
     funnelContext = randomInt(1, 10);
+    executionResistance = randomInt(1, 10);
 
     // Determine authority level based on perceivedNeedForHelp
     if (perceivedNeedForHelp >= 8) {
@@ -157,7 +248,7 @@ export function generateRandomProspectInBand(
       authorityLevel = 'advisor';
     }
 
-    // Calculate total (accounting for authority adjustment)
+    // Calculate Layer A (accounting for authority adjustment)
     let authorityScore = perceivedNeedForHelp;
     if (authorityLevel === 'advisor') {
       authorityScore = Math.max(0, authorityScore - 3);
@@ -165,36 +256,42 @@ export function generateRandomProspectInBand(
       authorityScore = Math.max(0, authorityScore - 1);
     }
 
-    total = positionProblemAlignment + painAmbitionIntensity + authorityScore + funnelContext;
+    const layerA = positionProblemAlignment + painAmbitionIntensity + authorityScore + funnelContext;
+    const layerB = executionResistance;
+    total = layerA + layerB;
     attempts++;
   } while ((total < minTotal || total > maxTotal) && attempts < maxAttempts);
 
   // If still not in range after max attempts, adjust to fit
   if (total < minTotal || total > maxTotal) {
-    const adjustment = Math.round((minTotal + maxTotal) / 2 - total);
-    const adjustmentPerDimension = Math.round(adjustment / 4);
+    const targetMid = Math.round((minTotal + maxTotal) / 2);
+    const currentLayerA = positionProblemAlignment + painAmbitionIntensity + 
+      (authorityLevel === 'advisor' ? Math.max(0, perceivedNeedForHelp - 3) : 
+       authorityLevel === 'peer' ? Math.max(0, perceivedNeedForHelp - 1) : perceivedNeedForHelp) + 
+      funnelContext;
     
-    positionProblemAlignment = Math.max(1, Math.min(10, positionProblemAlignment + adjustmentPerDimension));
-    painAmbitionIntensity = Math.max(1, Math.min(10, painAmbitionIntensity + adjustmentPerDimension));
-    perceivedNeedForHelp = Math.max(1, Math.min(10, perceivedNeedForHelp + adjustmentPerDimension));
-    funnelContext = Math.max(1, Math.min(10, funnelContext + adjustmentPerDimension));
-
-    // Recalculate
+    // Adjust execution resistance to hit target
+    const neededLayerB = targetMid - currentLayerA;
+    executionResistance = Math.max(1, Math.min(10, neededLayerB));
+    
+    // Recalculate total
     let authorityScore = perceivedNeedForHelp;
     if (authorityLevel === 'advisor') {
       authorityScore = Math.max(0, authorityScore - 3);
     } else if (authorityLevel === 'peer') {
       authorityScore = Math.max(0, authorityScore - 1);
     }
-    total = positionProblemAlignment + painAmbitionIntensity + authorityScore + funnelContext;
+    const layerA = positionProblemAlignment + painAmbitionIntensity + authorityScore + funnelContext;
+    total = layerA + executionResistance;
   }
 
-  const { tier } = calculateDifficultyIndex(
+  const { index, tier } = calculateDifficultyIndex(
     positionProblemAlignment,
     painAmbitionIntensity,
     perceivedNeedForHelp,
     authorityLevel,
-    funnelContext
+    funnelContext,
+    executionResistance
   );
 
   return {
@@ -203,7 +300,8 @@ export function generateRandomProspectInBand(
     perceivedNeedForHelp,
     authorityLevel,
     funnelContext,
-    difficultyIndex: total,
+    executionResistance,
+    difficultyIndex: index,
     difficultyTier: tier,
   };
 }

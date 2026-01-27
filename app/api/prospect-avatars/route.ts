@@ -88,6 +88,7 @@ export async function POST(request: NextRequest) {
       perceivedNeedForHelp,
       authorityLevel,
       funnelContext,
+      executionResistance,
       positionDescription,
       problems,
       painDrivers,
@@ -143,13 +144,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate difficulty index and tier
+    // Default execution resistance to 5 if not provided (backward compatibility)
+    const finalExecutionResistance = executionResistance !== undefined ? executionResistance : 5;
+
+    // Calculate difficulty index and tier (50-point model)
     const { index: difficultyIndex, tier: difficultyTier } = calculateDifficultyIndex(
       positionProblemAlignment,
       painAmbitionIntensity,
       perceivedNeedForHelp,
       authorityLevel,
-      funnelContext
+      funnelContext,
+      finalExecutionResistance
     );
 
     // Create avatar
@@ -166,6 +171,7 @@ export async function POST(request: NextRequest) {
         perceivedNeedForHelp,
         authorityLevel,
         funnelContext,
+        executionResistance: finalExecutionResistance,
         difficultyIndex,
         difficultyTier,
         positionDescription: positionDescription || null,

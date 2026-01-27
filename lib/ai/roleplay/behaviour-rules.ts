@@ -31,7 +31,7 @@ export function initializeBehaviourState(
   difficulty: ProspectDifficultyProfile,
   funnelContext: FunnelContext
 ): BehaviourState {
-  const { difficultyTier, authorityLevel } = difficulty;
+  const { difficultyTier, authorityLevel, executionResistance } = difficulty;
   const funnelImpact = getFunnelBehaviourImpact(funnelContext);
 
   // Base state from difficulty tier
@@ -134,6 +134,18 @@ export function initializeBehaviourState(
     baseState.currentResistance! + 
     (funnelImpact.earlyResistance === 'high' ? 2 : funnelImpact.earlyResistance === 'low' ? -2 : 0)
   ));
+
+  // Adjust based on execution resistance
+  // Low execution resistance increases logistics objections and resistance
+  if (executionResistance <= 4) {
+    // Extreme resistance - more logistics objections, higher resistance
+    baseState.objectionFrequency = baseState.objectionFrequency === 'low' ? 'medium' : 'high';
+    baseState.currentResistance = Math.min(10, baseState.currentResistance! + 1);
+  } else if (executionResistance <= 7) {
+    // Partial ability - moderate logistics concerns
+    // No major adjustment, but logistics objections more likely
+  }
+  // High execution resistance (8-10) - no adjustment needed
 
   return baseState as BehaviourState;
 }
@@ -248,8 +260,22 @@ export function shouldRaiseObjection(
 /**
  * Get objection type based on state
  */
-export function getObjectionType(state: BehaviourState): 'value' | 'trust' | 'fit' | 'logistics' {
+export function getObjectionType(
+  state: BehaviourState,
+  executionResistance?: number
+): 'value' | 'trust' | 'fit' | 'logistics' {
   const { trustLevel, valuePerception, currentResistance } = state;
+
+  // If execution resistance is low, logistics objections are more likely
+  if (executionResistance !== undefined && executionResistance <= 4) {
+    // Extreme resistance - logistics objections are primary concern
+    if (trustLevel < 3 || valuePerception < 3) {
+      // But still prioritize value/trust if extremely low
+      if (valuePerception < trustLevel) return 'value';
+      if (trustLevel < valuePerception) return 'trust';
+    }
+    return 'logistics';
+  }
 
   // Determine which pillar is weakest
   if (valuePerception < trustLevel && valuePerception < 5) {
@@ -261,5 +287,11 @@ export function getObjectionType(state: BehaviourState): 'value' | 'trust' | 'fi
   if (currentResistance > 7) {
     return 'fit';
   }
+  
+  // Logistics if execution resistance is medium or if other pillars are okay
+  if (executionResistance !== undefined && executionResistance <= 7) {
+    return 'logistics';
+  }
+  
   return 'logistics';
 }

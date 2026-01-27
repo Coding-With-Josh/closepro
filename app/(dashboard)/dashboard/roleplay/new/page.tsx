@@ -387,10 +387,10 @@ export default function NewRoleplayPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="easy">Easy (35-40 points)</SelectItem>
-                    <SelectItem value="realistic">Realistic (30-35 points)</SelectItem>
-                    <SelectItem value="hard">Hard (25-30 points)</SelectItem>
-                    <SelectItem value="elite">Elite (20-25 points)</SelectItem>
+                    <SelectItem value="easy">Easy (43-50 points)</SelectItem>
+                    <SelectItem value="realistic">Realistic (37-43 points)</SelectItem>
+                    <SelectItem value="hard">Hard (31-37 points)</SelectItem>
+                    <SelectItem value="elite">Elite (25-31 points)</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">

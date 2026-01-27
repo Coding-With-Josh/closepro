@@ -128,6 +128,7 @@ export async function PATCH(
     if (body.perceivedNeedForHelp !== undefined) updateData.perceivedNeedForHelp = body.perceivedNeedForHelp;
     if (body.authorityLevel !== undefined) updateData.authorityLevel = body.authorityLevel;
     if (body.funnelContext !== undefined) updateData.funnelContext = body.funnelContext;
+    if (body.executionResistance !== undefined) updateData.executionResistance = body.executionResistance;
     if (body.positionDescription !== undefined) updateData.positionDescription = body.positionDescription;
     if (body.problems !== undefined) updateData.problems = JSON.stringify(body.problems);
     if (body.painDrivers !== undefined) updateData.painDrivers = JSON.stringify(body.painDrivers);
@@ -139,14 +140,20 @@ export async function PATCH(
 
     // Recalculate difficulty if relevant fields changed
     if (body.positionProblemAlignment !== undefined || body.painAmbitionIntensity !== undefined ||
-        body.perceivedNeedForHelp !== undefined || body.authorityLevel !== undefined || body.funnelContext !== undefined) {
+        body.perceivedNeedForHelp !== undefined || body.authorityLevel !== undefined || 
+        body.funnelContext !== undefined || body.executionResistance !== undefined) {
       const updatedAvatar = { ...avatar[0], ...updateData };
+      const executionResistance = updatedAvatar.executionResistance !== undefined 
+        ? updatedAvatar.executionResistance 
+        : avatar[0].executionResistance || 5;
+      
       const { index: difficultyIndex, tier: difficultyTier } = calculateDifficultyIndex(
         updatedAvatar.positionProblemAlignment,
         updatedAvatar.painAmbitionIntensity,
         updatedAvatar.perceivedNeedForHelp,
         updatedAvatar.authorityLevel,
-        updatedAvatar.funnelContext
+        updatedAvatar.funnelContext,
+        executionResistance
       );
       
       updateData.difficultyIndex = difficultyIndex;

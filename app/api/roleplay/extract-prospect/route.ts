@@ -161,6 +161,7 @@ Extract and return JSON with:
   "perceivedNeedForHelp": number (0-10, how much they believe they need help),
   "authorityLevel": "advisee" | "peer" | "advisor",
   "funnelContext": number (0-10, how warm/cold: 0-3 cold, 4-6 warm, 7-8 educated, 9-10 referral),
+  "executionResistance": number (0-10, ability to proceed: 8-10 fully able with money/time/authority, 5-7 partial ability needs reprioritization, 1-4 extreme resistance with severe constraints),
   "positionDescription": string (brief description of their current situation),
   "problems": string[] (key problems mentioned),
   "painDrivers": string[] (pain-based motivations),
@@ -176,6 +177,13 @@ Extract and return JSON with:
     "responseSpeed": "slow" | "normal" | "fast"
   }
 }
+
+For executionResistance, look for signals like:
+- Money constraints mentioned (can't afford, budget issues) → lower score
+- Time availability (too busy, scheduling conflicts) → lower score
+- Decision authority (needs to check with spouse/boss) → lower score
+- External dependencies (waiting for something else) → lower score
+- Ready to proceed, has resources → higher score
 
 Return ONLY valid JSON, no markdown formatting.`;
 
@@ -202,13 +210,14 @@ Return ONLY valid JSON, no markdown formatting.`;
 
     const extracted = JSON.parse(content);
 
-    // Calculate difficulty
+    // Calculate difficulty (50-point model)
     const { index: difficultyIndex, tier: difficultyTier } = calculateDifficultyIndex(
       extracted.positionProblemAlignment || 5,
       extracted.painAmbitionIntensity || 5,
       extracted.perceivedNeedForHelp || 5,
       extracted.authorityLevel || 'peer',
-      extracted.funnelContext || 5
+      extracted.funnelContext || 5,
+      extracted.executionResistance || 5 // Default to medium ability if not extracted
     );
 
     // Create prospect avatar
@@ -227,6 +236,7 @@ Return ONLY valid JSON, no markdown formatting.`;
         perceivedNeedForHelp: extracted.perceivedNeedForHelp || 5,
         authorityLevel: extracted.authorityLevel || 'peer',
         funnelContext: extracted.funnelContext || 5,
+        executionResistance: extracted.executionResistance || 5,
         difficultyIndex,
         difficultyTier,
         positionDescription: extracted.positionDescription || null,

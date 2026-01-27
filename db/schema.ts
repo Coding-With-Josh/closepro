@@ -327,13 +327,17 @@ export const prospectAvatars = pgTable('prospect_avatars', {
   sourceType: text('source_type').notNull().default('manual'), // 'manual', 'transcript_derived'
   sourceTranscriptId: uuid('source_transcript_id').references(() => salesCalls.id, { onDelete: 'set null' }),
   
-  // 40-Point Difficulty Model (Layer 2)
+  // 50-Point Difficulty Model (Layer 2)
+  // Layer A: Persuasion Difficulty (40 points)
   positionProblemAlignment: integer('position_problem_alignment').notNull(), // 0-10
   painAmbitionIntensity: integer('pain_ambition_intensity').notNull(), // 0-10
   perceivedNeedForHelp: integer('perceived_need_for_help').notNull(), // 0-10
   authorityLevel: text('authority_level').notNull(), // 'advisee', 'peer', 'advisor'
-  funnelContext: integer('funnel_context').notNull(), // 0-10 (Layer 3)
-  difficultyIndex: integer('difficulty_index').notNull(), // 0-40 (calculated)
+  funnelContext: integer('funnel_context').notNull(), // 0-10
+  // Layer B: Execution Resistance (10 points)
+  executionResistance: integer('execution_resistance').notNull().default(5), // 0-10 (ability to proceed: money, time, effort, authority)
+  // Calculated totals
+  difficultyIndex: integer('difficulty_index').notNull(), // 0-50 (calculated: Layer A + Layer B)
   difficultyTier: text('difficulty_tier').notNull(), // 'easy', 'realistic', 'hard', 'elite', 'near_impossible'
   
   // Prospect Profile Details

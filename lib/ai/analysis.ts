@@ -47,6 +47,18 @@ export interface TimestampedFeedback {
   pillar?: 'value' | 'trust' | 'fit' | 'logistics';
 }
 
+export interface ProspectDifficultyAssessment {
+  // Prospect difficulty dimensions (50-point model)
+  positionProblemAlignment?: number; // 0-10
+  painAmbitionIntensity?: number; // 0-10
+  perceivedNeedForHelp?: number; // 0-10
+  authorityLevel?: 'advisee' | 'peer' | 'advisor';
+  funnelContext?: number; // 0-10
+  executionResistance?: number; // 0-10 (ability to proceed)
+  totalDifficultyScore?: number; // 0-50
+  difficultyTier?: 'easy' | 'realistic' | 'hard' | 'elite' | 'near_impossible';
+}
+
 export interface CallAnalysisResult {
   overallScore: number; // 0-100
   
@@ -64,6 +76,9 @@ export interface CallAnalysisResult {
   
   // Timestamped feedback
   timestampedFeedback: TimestampedFeedback[];
+  
+  // Prospect difficulty assessment (for contextualizing performance)
+  prospectDifficulty?: ProspectDifficultyAssessment;
 }
 
 /**
@@ -183,14 +198,28 @@ EVALUATION FRAMEWORK:
    - Follow-up & Next Steps
    - Professionalism
 
-3. COACHING RECOMMENDATIONS:
+3. PROSPECT DIFFICULTY ASSESSMENT (50-point model):
+   Analyze the PROSPECT's difficulty to contextualize the rep's performance:
+   - positionProblemAlignment (0-10): How well prospect's position/problems align with offer
+   - painAmbitionIntensity (0-10): Strength of pain or ambition
+   - perceivedNeedForHelp (0-10): How much they believe they need help
+   - authorityLevel: "advisee" | "peer" | "advisor"
+   - funnelContext (0-10): How warm/cold (0-3 cold, 4-6 warm, 7-8 educated, 9-10 referral)
+   - executionResistance (0-10): Ability to proceed (8-10 fully able, 5-7 partial, 1-4 extreme)
+   - totalDifficultyScore (0-50): Sum of all dimensions
+   - difficultyTier: "easy" | "realistic" | "hard" | "elite" | "near_impossible"
+   
+   IMPORTANT: Execution resistance must be reported separately. It increases difficulty but does not excuse poor sales skill. Flag structural blockers clearly.
+
+4. COACHING RECOMMENDATIONS:
    - Priority (high/medium/low)
    - Specific issue identified
    - Explanation of why it matters
    - Actionable guidance
    - Timestamp if applicable
+   - Note: Separate skill issues from lead quality/execution resistance issues
 
-4. TIMESTAMPED FEEDBACK:
+5. TIMESTAMPED FEEDBACK:
    - Specific moments in the call (with timestamps)
    - Type: strength, weakness, opportunity, warning
    - Relevant transcript segment
@@ -239,7 +268,17 @@ Return your analysis as JSON in this exact format:
       "pillar": "trust"
     },
     ...
-  ]
+  ],
+  "prospectDifficulty": {
+    "positionProblemAlignment": 7,
+    "painAmbitionIntensity": 6,
+    "perceivedNeedForHelp": 5,
+    "authorityLevel": "peer",
+    "funnelContext": 5,
+    "executionResistance": 4,
+    "totalDifficultyScore": 27,
+    "difficultyTier": "elite"
+  }
 }`;
 }
 
@@ -249,6 +288,22 @@ Return your analysis as JSON in this exact format:
 function normalizeAnalysis(analysis: any): CallAnalysisResult {
   // Ensure all scores are 0-100
   const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+
+  // Normalize prospect difficulty if present
+  let prospectDifficulty: ProspectDifficultyAssessment | undefined;
+  if (analysis.prospectDifficulty) {
+    const pd = analysis.prospectDifficulty;
+    prospectDifficulty = {
+      positionProblemAlignment: Math.max(0, Math.min(10, Math.round(pd.positionProblemAlignment || 5))),
+      painAmbitionIntensity: Math.max(0, Math.min(10, Math.round(pd.painAmbitionIntensity || 5))),
+      perceivedNeedForHelp: Math.max(0, Math.min(10, Math.round(pd.perceivedNeedForHelp || 5))),
+      authorityLevel: pd.authorityLevel || 'peer',
+      funnelContext: Math.max(0, Math.min(10, Math.round(pd.funnelContext || 5))),
+      executionResistance: Math.max(0, Math.min(10, Math.round(pd.executionResistance || 5))),
+      totalDifficultyScore: Math.max(0, Math.min(50, Math.round(pd.totalDifficultyScore || 25))),
+      difficultyTier: pd.difficultyTier || 'realistic',
+    };
+  }
 
   return {
     overallScore: clamp(analysis.overallScore || 0),
@@ -263,6 +318,7 @@ function normalizeAnalysis(analysis: any): CallAnalysisResult {
     timestampedFeedback: Array.isArray(analysis.timestampedFeedback)
       ? analysis.timestampedFeedback
       : [],
+    prospectDifficulty,
   };
 }
 

@@ -95,7 +95,11 @@ export async function generateProspectResponse(
   }
 
   // Determine if this response contains an objection
-  const objectionType = detectObjectionInResponse(prospectResponse, updatedBehaviourState);
+  const objectionType = detectObjectionInResponse(
+    prospectResponse, 
+    updatedBehaviourState,
+    context.prospectAvatar.difficulty.executionResistance
+  );
 
   return {
     response: prospectResponse,
@@ -111,16 +115,24 @@ function buildRoleplaySystemPrompt(context: RoleplayContext): string {
   const { offer, prospectAvatar, funnelContext, behaviourState } = context;
   const offerSummary = generateOfferSummary(offer);
   const salesStyle = getDefaultSalesStyle(offer);
-  const { difficultyTier, authorityLevel } = prospectAvatar.difficulty;
+  const { difficultyTier, authorityLevel, executionResistance } = prospectAvatar.difficulty;
+
+  // Execution resistance interpretation
+  const executionAbility = executionResistance >= 8 
+    ? 'Fully Able - Has money, time, and decision authority. Can proceed if convinced.'
+    : executionResistance >= 5
+    ? 'Partial Ability - Has some resources but may need payment plans, time restructuring, or prioritization reframing.'
+    : 'Extreme Resistance - Severe money/time constraints or external dependencies. Very difficult to close on-call.';
 
   return `You are playing the role of a sales prospect in a realistic roleplay scenario.
 
 ${offerSummary}
 
 PROSPECT PROFILE:
-Difficulty Tier: ${difficultyTier}
+Difficulty Tier: ${difficultyTier} (Total: ${prospectAvatar.difficulty.difficultyIndex}/50)
 Authority Level: ${authorityLevel}
 Funnel Context: ${funnelContext.type} (${funnelContext.score}/10)
+Execution Resistance: ${executionResistance}/10 - ${executionAbility}
 ${prospectAvatar.positionDescription ? `Position: ${prospectAvatar.positionDescription}` : ''}
 ${prospectAvatar.problems?.length ? `Problems: ${prospectAvatar.problems.join(', ')}` : ''}
 ${prospectAvatar.painDrivers?.length ? `Pain Drivers: ${prospectAvatar.painDrivers.join(', ')}` : ''}
@@ -147,13 +159,17 @@ CRITICAL RULES:
    - Value hasn't been established
    - Trust is low
    - Fit is unclear
-   - Logistics are a concern
-5. Your tone should match the offer category: ${salesStyle.tone}
-6. Be realistic - not scripted. Show hesitation, ask follow-ups, push back when appropriate.
-7. Never automatically accept a flawed pitch.
-8. Your responses should be conversational, natural, and human-like.
+   - Logistics are a concern (especially if execution resistance is low)
+5. Execution Resistance (${executionResistance}/10): This affects your ability to proceed:
+   - If execution resistance is LOW (1-4): You have severe constraints (money, time, authority). Raise logistics objections frequently. You cannot easily proceed even if convinced.
+   - If execution resistance is MEDIUM (5-7): You have partial ability. May need payment plans, time restructuring, or to discuss with others.
+   - If execution resistance is HIGH (8-10): You have resources and authority. Logistics objections should be minimal unless value/trust aren't established.
+6. Your tone should match the offer category: ${salesStyle.tone}
+7. Be realistic - not scripted. Show hesitation, ask follow-ups, push back when appropriate.
+8. Never automatically accept a flawed pitch.
+9. Your responses should be conversational, natural, and human-like.
 
-Respond as this prospect would, given your current state and the rep's message.`;
+Respond as this prospect would, given your current state, execution resistance level, and the rep's message.`;
 }
 
 /**
@@ -299,7 +315,8 @@ function analyzeRepAction(
  */
 function detectObjectionInResponse(
   response: string,
-  behaviourState: BehaviourState
+  behaviourState: BehaviourState,
+  executionResistance: number
 ): 'value' | 'trust' | 'fit' | 'logistics' | undefined {
   const lowerResponse = response.toLowerCase();
 
@@ -308,7 +325,8 @@ function detectObjectionInResponse(
     lowerResponse.includes('expensive') ||
     lowerResponse.includes('cost') ||
     lowerResponse.includes('worth it') ||
-    lowerResponse.includes('value')
+    lowerResponse.includes('value') ||
+    lowerResponse.includes('price')
   ) {
     return 'value';
   }
@@ -318,7 +336,8 @@ function detectObjectionInResponse(
     lowerResponse.includes('trust') ||
     lowerResponse.includes('skeptical') ||
     lowerResponse.includes('sounds too good') ||
-    lowerResponse.includes('been burned')
+    lowerResponse.includes('been burned') ||
+    lowerResponse.includes('scam')
   ) {
     return 'trust';
   }
@@ -327,24 +346,31 @@ function detectObjectionInResponse(
   if (
     lowerResponse.includes('not for me') ||
     lowerResponse.includes('not sure if') ||
-    lowerResponse.includes('different situation')
+    lowerResponse.includes('different situation') ||
+    lowerResponse.includes('doesn\'t apply')
   ) {
     return 'fit';
   }
 
-  // Logistics objections
+  // Logistics objections (more likely with low execution resistance)
   if (
     lowerResponse.includes('time') ||
     lowerResponse.includes('busy') ||
     lowerResponse.includes('think about it') ||
-    lowerResponse.includes('need to discuss')
+    lowerResponse.includes('need to discuss') ||
+    lowerResponse.includes('can\'t afford') ||
+    lowerResponse.includes('budget') ||
+    lowerResponse.includes('need to check') ||
+    lowerResponse.includes('spouse') ||
+    lowerResponse.includes('boss') ||
+    lowerResponse.includes('wait')
   ) {
     return 'logistics';
   }
 
   // Use behaviour state if unclear
   if (behaviourState.currentResistance > 6) {
-    return getObjectionType(behaviourState);
+    return getObjectionType(behaviourState, executionResistance);
   }
 
   return undefined;

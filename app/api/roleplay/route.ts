@@ -230,6 +230,7 @@ export async function POST(request: NextRequest) {
           perceivedNeedForHelp: prospectProfile.perceivedNeedForHelp,
           authorityLevel: prospectProfile.authorityLevel,
           funnelContext: prospectProfile.funnelContext,
+          executionResistance: prospectProfile.executionResistance,
           difficultyIndex: prospectProfile.difficultyIndex,
           difficultyTier: prospectProfile.difficultyTier,
           isTemplate: false,

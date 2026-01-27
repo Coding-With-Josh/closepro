@@ -129,7 +129,7 @@ export default function ProspectAvatarsPage() {
                   <h3 className="font-semibold text-lg mb-2">{avatar.name}</h3>
                   <div className="flex flex-wrap gap-2 mb-3">
                     <Badge className={getDifficultyColor(avatar.difficultyTier)}>
-                      {avatar.difficultyTier.toUpperCase()} ({avatar.difficultyIndex}/40)
+                      {avatar.difficultyTier.toUpperCase()} ({avatar.difficultyIndex}/50)
                     </Badge>
                     <Badge variant="outline">{getAuthorityLabel(avatar.authorityLevel)}</Badge>
                     {avatar.sourceType === 'transcript_derived' && (
