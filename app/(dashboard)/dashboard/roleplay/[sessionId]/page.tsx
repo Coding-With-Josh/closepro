@@ -59,7 +59,7 @@ export default function RoleplaySessionPage() {
     fetchSession();
     fetchUserProfile();
     initializeVoice();
-    
+
     // Handle timestamp navigation from feedback clicks
     const timestamp = searchParams?.get('timestamp');
     if (timestamp) {
@@ -77,7 +77,7 @@ export default function RoleplaySessionPage() {
         }
       }, 500);
     }
-    
+
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
@@ -325,7 +325,7 @@ export default function RoleplaySessionPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden bg-gradient-to-br from-background via-background to-muted/10">
+      <div className="flex-1 flex overflow-hidden bg-linear-to-br from-background via-background to-muted/10">
         {/* Video Grid Area (Left) */}
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="grid grid-cols-2 gap-4 w-full max-w-4xl">
@@ -338,7 +338,7 @@ export default function RoleplaySessionPage() {
                   : "border-border/50"
               )}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent flex items-center justify-center">
+              <div className="absolute inset-0 bg-linear-to-br from-primary/10 via-primary/5 to-transparent flex items-center justify-center">
                 <div className="text-center z-10">
                   <div className={cn(
                     "w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-3 transition-all duration-300 overflow-hidden",
@@ -392,7 +392,7 @@ export default function RoleplaySessionPage() {
                   : "border-border/50"
               )}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-muted/10 via-muted/5 to-transparent flex items-center justify-center">
+              <div className="absolute inset-0 bg-linear-to-br from-muted/10 via-muted/5 to-transparent flex items-center justify-center">
                 <div className="text-center z-10">
                   <div className={cn(
                     "w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-3 transition-all duration-300",
@@ -441,8 +441,8 @@ export default function RoleplaySessionPage() {
                 </div>
               ) : (
                 messages.map((msg, idx) => (
-                  <div 
-                    key={idx} 
+                  <div
+                    key={idx}
                     className="space-y-1"
                     data-timestamp={msg.timestamp || idx * 5000}
                   >

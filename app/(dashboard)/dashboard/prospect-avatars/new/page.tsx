@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import { Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { calculateDifficultyIndex } from '@/lib/ai/roleplay/prospect-avatar';
 
-export default function NewProspectAvatarPage() {
+function NewProspectAvatarContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const offerId = searchParams?.get('offerId');
@@ -434,5 +434,17 @@ export default function NewProspectAvatarPage() {
         </Card>
       </form>
     </div>
+  );
+}
+
+export default function NewProspectAvatarPage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto p-4 sm:p-6 max-w-4xl">
+        <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div>
+      </div>
+    }>
+      <NewProspectAvatarContent />
+    </Suspense>
   );
 }
