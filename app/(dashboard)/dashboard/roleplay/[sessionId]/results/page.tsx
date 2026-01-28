@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, TrendingUp, Target, Users, Package } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 interface Analysis {
   id: string;
@@ -38,7 +37,8 @@ interface Session {
     perceivedNeedForHelp: number;
     authorityLevel: string;
     funnelContext: number;
-    executionResistance?: number; // Optional for backward compatibility
+    executionResistance?: number;
+    offerId?: string;
   } | null;
 }
 
@@ -51,11 +51,7 @@ export default function RoleplayResultsPage() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchResults();
-  }, [sessionId]);
-
-  const fetchResults = async () => {
+  const fetchResults = useCallback(async () => {
     try {
       const response = await fetch(`/api/roleplay/${sessionId}`);
       const data = await response.json();
@@ -89,7 +85,11 @@ export default function RoleplayResultsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [sessionId]);
+
+  useEffect(() => {
+    fetchResults();
+  }, [fetchResults]);
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-500';
@@ -132,6 +132,14 @@ export default function RoleplayResultsPage() {
   const logisticsDetails = JSON.parse(analysis.logisticsDetails || '{}');
   const recommendations = JSON.parse(analysis.coachingRecommendations || '[]');
   const skillScores = JSON.parse(analysis.skillScores || '{}');
+  const parsedTimestampedFeedback = (() => {
+    try {
+      const p = JSON.parse(analysis.timestampedFeedback || '[]');
+      return Array.isArray(p) ? p : [];
+    } catch {
+      return [];
+    }
+  })();
 
   // Generate diagnostic insight
   const getDiagnosticInsight = () => {
@@ -145,7 +153,7 @@ export default function RoleplayResultsPage() {
     };
 
     const lowest = Math.min(scores.value, scores.trust, scores.fit, scores.logistics);
-    const lowestPillar = Object.entries(scores).find(([_, score]) => score === lowest)?.[0];
+    const lowestPillar = Object.entries(scores).find(([, score]) => score === lowest)?.[0];
 
     if (lowestPillar === 'value') {
       return 'This sale was lost in Value, not the Close. Focus on building stronger value before presenting.';
@@ -432,12 +440,12 @@ export default function RoleplayResultsPage() {
         <Card className="p-4 sm:p-6">
           <h2 className="text-xl font-semibold mb-4">10-Category Skill Breakdown</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.entries(skillScores).slice(0, 10).map(([category, scores]: [string, any]) => (
+            {Object.entries(skillScores as Record<string, Record<string, number> | number>).slice(0, 10).map(([category, scores]) => (
               <div key={category} className="border rounded-lg p-3">
                 <h3 className="font-semibold mb-2 capitalize">{category.replace(/_/g, ' ')}</h3>
                 {typeof scores === 'object' && scores !== null ? (
                   <div className="space-y-1">
-                    {Object.entries(scores).slice(0, 3).map(([skill, score]: [string, any]) => (
+                    {Object.entries(scores).slice(0, 3).map(([skill, score]) => (
                       <div key={skill} className="flex justify-between text-sm">
                         <span className="text-muted-foreground">{skill}</span>
                         <span className="font-medium">{score}/100</span>
@@ -458,7 +466,7 @@ export default function RoleplayResultsPage() {
         <Card className="p-4 sm:p-6">
           <h2 className="text-xl font-semibold mb-4">3-5 Prioritized Fixes</h2>
           <div className="space-y-3">
-            {recommendations.slice(0, 5).map((rec: any, i: number) => (
+            {recommendations.slice(0, 5).map((rec: { priority?: string; category?: string; timestamp?: number; issue?: string; explanation?: string; action?: string; transcriptSegment?: string }, i: number) => (
               <div 
                 key={i} 
                 className="border-l-4 border-primary pl-4 hover:bg-muted/50 rounded-r-lg p-2 transition-colors cursor-pointer"
@@ -497,7 +505,7 @@ export default function RoleplayResultsPage() {
                 )}
                 {rec.transcriptSegment && (
                   <div className="mt-2 p-2 bg-muted rounded text-xs text-muted-foreground">
-                    "{rec.transcriptSegment}"
+                    &quot;{rec.transcriptSegment}&quot;
                   </div>
                 )}
                 {rec.timestamp && (
@@ -516,7 +524,7 @@ export default function RoleplayResultsPage() {
         <Card className="p-4 sm:p-6">
           <h2 className="text-xl font-semibold mb-4">Moment-by-Moment Feedback</h2>
           <div className="space-y-3">
-            {parsedTimestampedFeedback.slice(0, 10).map((feedback: any, i: number) => (
+            {parsedTimestampedFeedback.slice(0, 10).map((feedback: { type?: string; pillar?: string; timestamp?: number; message?: string; transcriptSegment?: string }, i: number) => (
               <div
                 key={i}
                 className={`border-l-4 pl-4 p-2 rounded-r-lg transition-colors cursor-pointer hover:bg-muted/50 ${
@@ -554,12 +562,12 @@ export default function RoleplayResultsPage() {
                 <p className="text-sm font-medium mb-1">{feedback.message}</p>
                 {feedback.transcriptSegment && (
                   <div className="mt-2 p-2 bg-muted rounded text-xs text-muted-foreground">
-                    "{feedback.transcriptSegment}"
+                    &quot;{feedback.transcriptSegment}&quot;
                   </div>
                 )}
                 {feedback.timestamp && (
                   <p className="text-xs text-primary mt-2">
-                    Click to jump to this moment • <Link href={`/dashboard/roleplay/new?offerId=${session?.prospectAvatar?.offerId || ''}&rerunFrom=${feedback.timestamp}`} className="underline">Rerun from here</Link>
+                    Click to jump to this moment • <Link href={`/dashboard/roleplay/new?offerId=${session?.prospectAvatar?.offerId ?? ''}&rerunFrom=${feedback.timestamp}`} className="underline">Rerun from here</Link>
                   </p>
                 )}
               </div>
