@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -34,17 +34,10 @@ function ProspectSelectionContent() {
   const [prospects, setProspects] = useState<ProspectAvatar[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const hasTriedGenerateRef = useRef(false);
 
-  useEffect(() => {
-    if (offerId) {
-      fetchOffer();
-      fetchProspects();
-    } else {
-      router.push('/dashboard/roleplay/new');
-    }
-  }, [offerId, router]);
-
-  const fetchOffer = async () => {
+  // Define fetchOffer and fetchProspects BEFORE useEffect that uses them
+  const fetchOffer = useCallback(async () => {
     if (!offerId) return;
     try {
       const response = await fetch(`/api/offers/${offerId}`);
@@ -55,9 +48,9 @@ function ProspectSelectionContent() {
     } catch (error) {
       console.error('Error fetching offer:', error);
     }
-  };
+  }, [offerId]);
 
-  const fetchProspects = async () => {
+  const fetchProspects = useCallback(async () => {
     if (!offerId) return;
     try {
       const response = await fetch(`/api/prospect-avatars?offerId=${offerId}`);
@@ -70,10 +63,21 @@ function ProspectSelectionContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [offerId]);
 
-  const handleGenerateProspects = async () => {
-    if (!offerId) return;
+  useEffect(() => {
+    if (offerId) {
+      hasTriedGenerateRef.current = false; // Reset when offerId changes
+      fetchOffer();
+      fetchProspects();
+    } else {
+      router.push('/dashboard/roleplay/new');
+    }
+  }, [offerId, router, fetchOffer, fetchProspects]);
+
+  const handleGenerateProspects = useCallback(async () => {
+    if (!offerId || hasTriedGenerateRef.current) return;
+    hasTriedGenerateRef.current = true;
     setGenerating(true);
     try {
       const response = await fetch(`/api/offers/${offerId}/prospects/generate`, {
@@ -88,10 +92,11 @@ function ProspectSelectionContent() {
     } catch (error: any) {
       console.error('Error generating prospects:', error);
       toastError(error.message || 'Failed to generate prospects');
+      hasTriedGenerateRef.current = false; // Reset on error so user can retry
     } finally {
       setGenerating(false);
     }
-  };
+  }, [offerId, fetchProspects]);
 
   const handleProspectSelect = async (prospectId: string) => {
     if (!offerId) return;
@@ -160,6 +165,13 @@ function ProspectSelectionContent() {
     }
   };
 
+  // Auto-generate 4 prospects if none exist and offer is new (must be before any early return)
+  useEffect(() => {
+    if (prospects.length === 0 && offerId && !loading && !hasTriedGenerateRef.current) {
+      handleGenerateProspects();
+    }
+  }, [prospects.length, offerId, loading, handleGenerateProspects]);
+
   if (loading) {
     return (
       <div className="container mx-auto p-4 sm:p-6">
@@ -170,13 +182,6 @@ function ProspectSelectionContent() {
       </div>
     );
   }
-
-  // Auto-generate 4 prospects if none exist and offer is new
-  useEffect(() => {
-    if (prospects.length === 0 && offerId && !loading) {
-      handleGenerateProspects();
-    }
-  }, [prospects.length, offerId, loading]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-6xl">

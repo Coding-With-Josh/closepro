@@ -85,6 +85,34 @@ export default function RoleplayPage() {
     });
   };
 
+  const getOfferTypeLabel = (type?: string) => {
+    if (!type) return '—';
+    const labels: Record<string, string> = {
+      b2c_health: 'B2C Health',
+      b2c_relationships: 'B2C Relationships',
+      b2c_wealth: 'B2C Wealth',
+      mixed_wealth: 'Mixed Wealth',
+      b2b_services: 'B2B Services',
+    };
+    return labels[type] || type;
+  };
+
+  const getDifficultyBadgeVariant = (tier: string | null) => {
+    if (!tier) return 'outline';
+    switch (tier) {
+      case 'easy':
+        return 'default';
+      case 'realistic':
+        return 'secondary';
+      case 'hard':
+        return 'outline';
+      case 'elite':
+        return 'destructive';
+      default:
+        return 'outline';
+    }
+  };
+
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
