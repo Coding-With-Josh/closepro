@@ -9,8 +9,6 @@ import { Plus, Package } from 'lucide-react';
 import Link from 'next/link';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
 
 interface Offer {
   id: string;
@@ -32,6 +30,15 @@ export default function OffersPage() {
 
   useEffect(() => {
     fetchOffers();
+  }, []);
+
+  // Refresh offers when page becomes visible (e.g., after navigation)
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchOffers();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   const fetchOffers = async () => {
@@ -86,12 +93,16 @@ export default function OffersPage() {
             Manage your sales offers for roleplays
           </p>
         </div>
-        <Link href="/dashboard/offers/new" className="w-full sm:w-auto">
-          <Button className="w-full sm:w-auto">
-            <Plus className="h-4 w-4 mr-2" />
-            New Offer
-          </Button>
-        </Link>
+        <Button 
+          className="w-full sm:w-auto"
+          onClick={() => {
+            console.log('New Offer button clicked');
+            router.push('/dashboard/offers/new');
+          }}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          New Offer
+        </Button>
       </div>
 
       {/* Offers List */}
@@ -106,12 +117,15 @@ export default function OffersPage() {
               <EmptyDescription>Create your first offer to start using it in roleplays</EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <Link href="/dashboard/offers/new">
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Offer
-                </Button>
-              </Link>
+              <Button
+                onClick={() => {
+                  console.log('Create Offer button clicked');
+                  router.push('/dashboard/offers/new');
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Offer
+              </Button>
             </EmptyContent>
           </Empty>
         </Card>

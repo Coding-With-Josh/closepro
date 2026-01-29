@@ -123,6 +123,7 @@ export default function DashboardLayout({
       </div>
       <TourOverlay />
       <TourStepCard />
+      </div>
     </TourProvider>
   );
 }

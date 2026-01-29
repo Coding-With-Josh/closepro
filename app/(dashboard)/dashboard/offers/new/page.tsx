@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { toastError } from '@/lib/toast';
+import { toastError, toastSuccess } from '@/lib/toast';
 
 const offerSchema = z.object({
   // Top Section
@@ -91,9 +91,10 @@ export default function NewOfferPage() {
   });
 
   const handleSubmit = form.handleSubmit(async (data) => {
-    const problems = data.primaryProblemsSolved.filter((p) => p.trim());
-    if (problems.length < 3) {
-      form.setError('primaryProblemsSolved', { message: 'Please provide at least 3 problems this offer solves' });
+    console.log('Form submitted with data:', data);
+    
+    if (!data.coreProblems || !data.coreProblems.trim()) {
+      form.setError('coreProblems', { message: 'Please provide core problems this offer solves' });
       return;
     }
 
@@ -103,26 +104,86 @@ export default function NewOfferPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...data,
-          primaryProblemsSolved: problems,
-          commonSkepticismTriggers: data.commonObjections?.filter((o) => o.trim()) || [],
-          downsellOptions: data.downsellOptions?.filter((o) => o.trim()) || [],
+          name: data.name,
+          offerCategory: data.offerCategory,
+          deliveryModel: data.deliveryModel,
+          coreOfferPrice: data.coreOfferPrice,
+          whoItsFor: data.whoItsFor,
+          customerStage: data.customerStage,
+          coreProblems: data.coreProblems,
+          desiredOutcome: data.desiredOutcome,
+          tangibleOutcomes: data.tangibleOutcomes,
+          emotionalOutcomes: data.emotionalOutcomes,
+          deliverables: data.deliverables,
+          paymentOptions: data.paymentOptions,
+          timePerWeek: data.timePerWeek,
+          estimatedTimeToResults: data.estimatedTimeToResults,
+          effortRequired: data.effortRequired,
+          caseStudyStrength: data.caseStudyStrength,
+          guaranteesRefundTerms: data.guaranteesRefundTerms,
+          primaryFunnelSource: data.primaryFunnelSource,
+          funnelContextAdditional: data.funnelContextAdditional,
+          // Legacy compatibility
+          coreOutcome: data.desiredOutcome || data.coreOutcome,
+          mechanismHighLevel: data.deliverables || data.mechanismHighLevel,
+          priceRange: data.coreOfferPrice || data.priceRange,
+          primaryProblemsSolved: data.coreProblems ? [data.coreProblems] : [],
         }),
       });
 
+      const responseText = await response.text();
+      console.log('Raw API response:', response.status, responseText);
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create offer');
+        let errorMessage = 'Failed to create offer';
+        try {
+          const error = JSON.parse(responseText);
+          errorMessage = error.error || errorMessage;
+        } catch (e) {
+          errorMessage = `Server error: ${response.status} ${response.statusText}. Response: ${responseText.substring(0, 200)}`;
+        }
+        console.error('API error:', errorMessage);
+        toastError(errorMessage);
+        setLoading(false);
+        return; // Don't redirect on error
       }
 
-      router.push('/dashboard/offers');
+      let result;
+      try {
+        result = JSON.parse(responseText);
+        console.log('Offer created successfully:', result);
+      } catch (e) {
+        console.error('Failed to parse response:', responseText);
+        toastError('Invalid response from server');
+        setLoading(false);
+        return;
+      }
+      
+      if (result.offer) {
+        toastSuccess('Offer created successfully');
+        // Small delay to ensure toast is visible
+        setTimeout(() => {
+          router.push('/dashboard/offers');
+        }, 500);
+      } else {
+        console.error('Response missing offer:', result);
+        toastError('Offer creation succeeded but response is missing offer data');
+        setLoading(false);
+      }
     } catch (error: unknown) {
       console.error('Error creating offer:', error);
-      toastError('Failed to create offer: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    } finally {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      toastError(`Failed to create offer: ${errorMessage}`);
       setLoading(false);
+      // Don't redirect on error
     }
-  });
+    },
+    (errors) => {
+      // Handle validation errors
+      console.log('Form validation errors:', errors);
+      toastError('Please fix the form errors before submitting');
+    }
+  );
 
 
   return (
@@ -460,7 +521,17 @@ export default function NewOfferPage() {
                 Cancel
               </Button>
             </Link>
-            <Button type="submit" disabled={loading} className="flex-1 w-full sm:w-auto">
+            <Button 
+              type="submit" 
+              disabled={loading} 
+              className="flex-1 w-full sm:w-auto"
+              onClick={() => {
+                console.log('Create Offer button clicked');
+                console.log('Form state:', form.formState);
+                console.log('Form errors:', form.formState.errors);
+                console.log('Form values:', form.getValues());
+              }}
+            >
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
