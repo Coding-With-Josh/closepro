@@ -5,6 +5,22 @@ import { db } from '@/db';
 import { salesCalls } from '@/db/schema';
 import { eq, or, and, isNull } from 'drizzle-orm';
 
+function emptyFigures(month: string) {
+  return {
+    month,
+    callsBooked: 0,
+    callsShowed: 0,
+    callsQualified: 0,
+    salesMade: 0,
+    closeRate: 0,
+    showRate: 0,
+    qualifiedRate: 0,
+    cashCollected: 0,
+    revenueGenerated: 0,
+    cashCollectedPct: 0,
+  };
+}
+
 /**
  * GET - Figures for a given month (sales reality: booked, showed, qualified, closed, revenue).
  * Query: month=YYYY-MM (required).
@@ -39,24 +55,50 @@ export async function GET(request: NextRequest) {
 
     const userId = session.user.id;
 
-    const rows = await db
-      .select()
-      .from(salesCalls)
-      .where(
-        and(
-          eq(salesCalls.userId, userId),
-          or(
-            eq(salesCalls.status, 'manual'),
-            and(
-              eq(salesCalls.status, 'completed'),
-              or(
-                eq(salesCalls.analysisIntent, 'update_figures'),
-                isNull(salesCalls.analysisIntent)
+    let rows: Array<{
+      callDate: Date | null;
+      createdAt: Date;
+      originalCallId: string | null;
+      result: string | null;
+      qualified: boolean | null;
+      cashCollected: number | null;
+      revenueGenerated: number | null;
+    }>;
+
+    try {
+      rows = await db
+        .select({
+          callDate: salesCalls.callDate,
+          createdAt: salesCalls.createdAt,
+          originalCallId: salesCalls.originalCallId,
+          result: salesCalls.result,
+          qualified: salesCalls.qualified,
+          cashCollected: salesCalls.cashCollected,
+          revenueGenerated: salesCalls.revenueGenerated,
+        })
+        .from(salesCalls)
+        .where(
+          and(
+            eq(salesCalls.userId, userId),
+            or(
+              eq(salesCalls.status, 'manual'),
+              and(
+                eq(salesCalls.status, 'completed'),
+                or(
+                  eq(salesCalls.analysisIntent, 'update_figures'),
+                  isNull(salesCalls.analysisIntent)
+                )
               )
             )
           )
-        )
-      );
+        );
+    } catch (dbError: unknown) {
+      const code = (dbError as { code?: string })?.code;
+      if (code === '42703') {
+        return NextResponse.json(emptyFigures(monthParam));
+      }
+      throw dbError;
+    }
 
     const dateFor = (row: { callDate: Date | null; createdAt: Date }) =>
       row.callDate ? new Date(row.callDate) : new Date(row.createdAt);

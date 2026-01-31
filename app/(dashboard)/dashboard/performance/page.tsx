@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -87,7 +87,7 @@ export default function PerformancePage() {
   };
 
   const handleDownloadSummary = () => {
-    if (!performance || !summaryPrintRef.current) return;
+    if (!performance) return;
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
     const period = performance.period;
@@ -108,8 +108,10 @@ export default function PerformancePage() {
     `;
     printWindow.document.write(content);
     printWindow.document.close();
-    printWindow.print();
-    printWindow.onafterprint = () => printWindow.close();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.onafterprint = () => printWindow.close();
+    }, 250);
   };
 
   const getScoreColor = (score: number) => {

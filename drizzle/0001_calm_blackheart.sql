@@ -1,1 +1,1 @@
-ALTER TABLE "prospect_avatars" ADD COLUMN "execution_resistance" integer DEFAULT 5 NOT NULL;
+ALTER TABLE "prospect_avatars" ADD COLUMN IF NOT EXISTS "execution_resistance" integer DEFAULT 5 NOT NULL;
