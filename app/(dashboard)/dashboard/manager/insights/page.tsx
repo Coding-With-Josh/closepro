@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Lightbulb, AlertCircle, Target } from 'lucide-react';
 import Link from 'next/link';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import { EmptyInsightsIllustration } from '@/components/illustrations';
 
 export default function ManagerInsightsPage() {
   const [loading, setLoading] = useState(true);
@@ -144,8 +145,8 @@ export default function ManagerInsightsPage() {
         <Card className="p-12">
           <Empty>
             <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <Lightbulb className="size-6" />
+              <EmptyMedia variant="illustration" className="size-32">
+                <EmptyInsightsIllustration className="size-full max-w-[8rem] max-h-[8rem]" />
               </EmptyMedia>
               <EmptyTitle>No insights available yet</EmptyTitle>
               <EmptyDescription>Insights will appear here as your team completes calls and roleplays.</EmptyDescription>

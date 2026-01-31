@@ -5,10 +5,21 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Loader2, ArrowLeft, User } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Plus, Loader2, ArrowLeft, Play, Phone } from 'lucide-react';
 import Link from 'next/link';
+import { resolveProspectAvatarUrl } from '@/lib/prospect-avatar';
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
+import { EmptyProspectsIllustration } from '@/components/illustrations';
 import { toastError } from '@/lib/toast';
 import { Suspense } from 'react';
 
@@ -16,6 +27,10 @@ interface Offer {
   id: string;
   name: string;
   offerCategory: string;
+  priceRange?: string;
+  coreOutcome?: string;
+  mechanismHighLevel?: string;
+  coreOfferPrice?: string;
 }
 
 interface ProspectAvatar {
@@ -23,6 +38,7 @@ interface ProspectAvatar {
   name: string;
   difficultyTier: string;
   positionDescription?: string;
+  avatarUrl?: string | null;
   sourceType: 'manual' | 'transcript_derived' | 'auto_generated';
 }
 
@@ -34,6 +50,7 @@ function ProspectSelectionContent() {
   const [prospects, setProspects] = useState<ProspectAvatar[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [selectedProspect, setSelectedProspect] = useState<ProspectAvatar | null>(null);
   const hasTriedGenerateRef = useRef(false);
 
   // Define fetchOffer and fetchProspects BEFORE useEffect that uses them
@@ -82,6 +99,8 @@ function ProspectSelectionContent() {
     try {
       const response = await fetch(`/api/offers/${offerId}/prospects/generate`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
       });
       if (response.ok) {
         await fetchProspects();
@@ -98,8 +117,35 @@ function ProspectSelectionContent() {
     }
   }, [offerId, fetchProspects]);
 
+  const handleRegenerateProspects = useCallback(async () => {
+    if (!offerId) return;
+    setGenerating(true);
+    try {
+      const response = await fetch(
+        `/api/offers/${offerId}/prospects/generate?regenerate=true`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ regenerate: true }),
+        }
+      );
+      if (response.ok) {
+        await fetchProspects();
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to regenerate prospects');
+      }
+    } catch (error: any) {
+      console.error('Error regenerating prospects:', error);
+      toastError(error.message || 'Failed to regenerate prospects');
+    } finally {
+      setGenerating(false);
+    }
+  }, [offerId, fetchProspects]);
+
   const handleProspectSelect = async (prospectId: string) => {
     if (!offerId) return;
+    setSelectedProspect(null); // Close dialog
     try {
       const response = await fetch('/api/roleplay', {
         method: 'POST',
@@ -118,9 +164,9 @@ function ProspectSelectionContent() {
 
       const data = await response.json();
       router.push(`/dashboard/roleplay/${data.session.id}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error starting roleplay:', error);
-      toastError(error.message || 'Failed to start roleplay');
+      toastError(error instanceof Error ? error.message : 'Failed to start roleplay');
     }
   };
 
@@ -165,6 +211,54 @@ function ProspectSelectionContent() {
     }
   };
 
+  const getModeLabel = (tier: string) => {
+    const labels: Record<string, string> = {
+      easy: 'Easy Mode',
+      realistic: 'Intermediate Mode',
+      hard: 'Hard Mode',
+      elite: 'Expert Mode',
+    };
+    return labels[tier] ?? `${tier.charAt(0).toUpperCase()}${tier.slice(1)} Mode`;
+  };
+
+  const getCardAccentClasses = (tier: string) => {
+    const classes: Record<string, string> = {
+      easy: 'bg-emerald-500/20',
+      realistic: 'bg-sky-500/20',
+      hard: 'bg-orange-500/20',
+      elite: 'bg-red-500/20',
+    };
+    return classes[tier] ?? 'bg-muted';
+  };
+
+  const getCardAccentBullet = (tier: string) => {
+    const classes: Record<string, string> = {
+      easy: 'bg-emerald-500',
+      realistic: 'bg-sky-500',
+      hard: 'bg-orange-500',
+      elite: 'bg-red-500',
+    };
+    return classes[tier] ?? 'bg-muted-foreground';
+  };
+
+  const getCallTypeTag = (tier: string) => {
+    const tags: Record<string, string> = {
+      easy: 'Discovery',
+      realistic: 'Objection Handling',
+      hard: 'Full Call',
+      elite: 'Full Call',
+    };
+    return tags[tier] ?? 'Full Call';
+  };
+
+  const getShortTitle = (p: ProspectAvatar) => {
+    if (!p.positionDescription) return getModeLabel(p.difficultyTier);
+    const firstSentence = p.positionDescription.split(/[.!?]/)[0]?.trim() ?? '';
+    const match = firstSentence.match(/(?:^|\s)(?:the\s+)?([A-Za-z]+\s+[A-Za-z]+)(?:\s|,|$)/i);
+    if (match) return match[1];
+    return firstSentence.slice(0, 40) + (firstSentence.length > 40 ? '…' : '');
+  };
+
   // Auto-generate 4 prospects if none exist and offer is new (must be before any early return)
   useEffect(() => {
     if (prospects.length === 0 && offerId && !loading && !hasTriedGenerateRef.current) {
@@ -185,6 +279,74 @@ function ProspectSelectionContent() {
 
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-6xl">
+      {/* Prospect detail dialog - two-column RepArena-style */}
+      <Dialog open={!!selectedProspect} onOpenChange={(open) => !open && setSelectedProspect(null)}>
+        <DialogContent className="sm:max-w-4xl p-0 gap-0 overflow-hidden">
+          {selectedProspect && (
+            <div className="flex flex-col sm:flex-row min-h-[420px]">
+              {/* Left: gradient + circular headshot */}
+              <div className="relative w-full sm:w-1/3 min-h-[240px] sm:min-h-0 flex items-center justify-center bg-gradient-to-br from-emerald-50 to-green-100 dark:from-emerald-950/30 dark:to-green-900/20 p-8">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06]" style={{ backgroundImage: 'linear-gradient(currentColor 1px, transparent 1px), linear-gradient(90deg, currentColor 1px, transparent 1px)', backgroundSize: '24px 24px' }} aria-hidden />
+                <Avatar className="size-40 sm:size-48 shrink-0 ring-4 ring-white/80 dark:ring-background/80 shadow-lg">
+                  <AvatarImage src={resolveProspectAvatarUrl(selectedProspect.id, selectedProspect.name, selectedProspect.avatarUrl)} alt={selectedProspect.name} className="object-cover" />
+                  <AvatarFallback className="text-2xl bg-muted">{selectedProspect.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+              </div>
+              {/* Right: name, context, selling offer, CTA */}
+              <div className="flex-1 flex flex-col p-6 sm:p-8 min-w-0">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div>
+                    <DialogTitle className="text-2xl font-bold mb-1">{selectedProspect.name}</DialogTitle>
+                    <DialogDescription className="text-sm text-muted-foreground">
+                      Start A Discovery Call With {getShortTitle(selectedProspect)}
+                    </DialogDescription>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={`size-2 rounded-full ${getCardAccentBullet(selectedProspect.difficultyTier)}`} aria-hidden />
+                    <span className="text-xs font-medium text-muted-foreground">{getModeLabel(selectedProspect.difficultyTier)}</span>
+                  </div>
+                </div>
+                <div className="flex-1 space-y-4 overflow-y-auto pr-1">
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2">Prospect Context</h4>
+                    {selectedProspect.positionDescription ? (
+                      <p className="text-sm text-foreground leading-relaxed rounded-md bg-muted/50 p-3 max-h-32 overflow-y-auto">
+                        {selectedProspect.positionDescription}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic p-3 rounded-md bg-muted/50">No bio added yet.</p>
+                    )}
+                  </div>
+                  {offer && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-1">Selling {offer.name}</h4>
+                      {(offer.priceRange ?? offer.coreOfferPrice) && (
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Price point: {offer.coreOfferPrice ?? offer.priceRange}
+                        </p>
+                      )}
+                      <p className="text-sm text-foreground leading-relaxed rounded-md bg-muted/50 p-3 max-h-24 overflow-y-auto">
+                        {offer.coreOutcome ?? offer.mechanismHighLevel ?? offer.offerCategory ?? 'No offer description.'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-between gap-4 mt-6 pt-4 border-t">
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedProspect(null)} className="-ml-2">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                  </Button>
+                  <Button onClick={() => handleProspectSelect(selectedProspect.id)}>
+                    <Phone className="h-4 w-4 mr-2" />
+                    Start Discovery
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -205,47 +367,60 @@ function ProspectSelectionContent() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="mb-4 sm:mb-6">
-        <Link href="/dashboard/roleplay/new">
-          <Button variant="ghost" size="sm" className="mb-2">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Offer Selection
-          </Button>
-        </Link>
-        <h1 className="text-2xl sm:text-3xl font-bold">Prospect Selection</h1>
-        <p className="text-sm sm:text-base text-muted-foreground mt-1">
-          Choose a prospect for {offer?.name || 'this offer'}
-        </p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <Link href="/dashboard/roleplay/new">
+            <Button variant="ghost" size="sm" className="mb-2 -ml-2">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Offer Selection
+            </Button>
+          </Link>
+          <h1 className="text-2xl sm:text-3xl font-bold">Choose A Prospect And Start An AI Roleplay</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
+            {offer?.name ? `For ${offer.name}` : 'Select a prospect to begin'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {offerId && (
+            <Link href={`/dashboard/offers/${offerId}/prospects/new`}>
+              <Button variant="outline" size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Create New
+              </Button>
+            </Link>
+          )}
+          <Link href="/dashboard/roleplay">
+            <Button size="sm">
+              <Phone className="h-4 w-4 mr-2" />
+              View Call History
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      {/* Difficulty Presets */}
-      <Card className="p-4 sm:p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4">Quick Start - Difficulty Presets</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Quick Start - Difficulty Presets (compact) */}
+      <div className="mb-6">
+        <p className="text-sm text-muted-foreground mb-2">Quick start by difficulty:</p>
+        <div className="flex flex-wrap gap-2">
           {['easy', 'realistic', 'hard', 'elite'].map((difficulty) => (
             <Button
               key={difficulty}
               variant="outline"
-              className="h-auto py-4 flex flex-col items-center gap-2"
+              size="sm"
+              className="h-9"
               onClick={() => handleDifficultySelect(difficulty)}
             >
-              <span className="font-semibold capitalize">{difficulty}</span>
-              <span className="text-xs text-muted-foreground">
-                {difficulty === 'easy' && '43-50 points'}
-                {difficulty === 'realistic' && '37-43 points'}
-                {difficulty === 'hard' && '31-37 points'}
-                {difficulty === 'elite' && '25-31 points'}
-              </span>
+              {getModeLabel(difficulty)}
             </Button>
           ))}
         </div>
-      </Card>
+      </div>
 
       {/* Saved Prospects */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Saved Prospects</h2>
-          {prospects.length === 0 && (
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <h2 className="text-lg font-semibold">Prospects</h2>
+          {prospects.length === 0 ? (
             <Button
               variant="outline"
               size="sm"
@@ -264,6 +439,22 @@ function ProspectSelectionContent() {
                 </>
               )}
             </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRegenerateProspects}
+              disabled={generating}
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Regenerating...
+                </>
+              ) : (
+                'Regenerate prospects (with bios)'
+              )}
+            </Button>
           )}
         </div>
 
@@ -271,8 +462,8 @@ function ProspectSelectionContent() {
           <Card className="p-8 sm:p-12">
             <Empty>
               <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <User className="size-6" />
+                <EmptyMedia variant="illustration" className="size-32">
+                  <EmptyProspectsIllustration className="size-full max-w-[8rem] max-h-[8rem]" />
                 </EmptyMedia>
                 <EmptyTitle>No prospects yet</EmptyTitle>
                 <EmptyDescription>
@@ -306,47 +497,55 @@ function ProspectSelectionContent() {
             </Empty>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {/* Create New Prospect Card */}
             {offerId && (
               <Card
-                className="p-6 border-2 border-dashed hover:border-primary cursor-pointer transition-all flex flex-col items-center justify-center min-h-[200px]"
+                className="overflow-hidden border-2 border-dashed hover:border-primary cursor-pointer transition-all flex flex-col min-h-[280px]"
                 onClick={() => router.push(`/dashboard/offers/${offerId}/prospects/new`)}
               >
-                <Plus className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="font-semibold text-lg mb-2">Create New Prospect</h3>
-                <p className="text-sm text-muted-foreground text-center">
-                  Build a custom prospect for this offer
-                </p>
+                <div className="flex-1 min-h-[200px] flex flex-col items-center justify-center bg-muted/50 p-6">
+                  <Plus className="h-14 w-14 text-muted-foreground mb-3" />
+                  <h3 className="font-semibold text-lg mb-1">Create New Prospect</h3>
+                  <p className="text-sm text-muted-foreground text-center">
+                    Build a custom prospect
+                  </p>
+                </div>
+                <div className="p-4 border-t">
+                  <p className="text-xs text-muted-foreground">Add your own</p>
+                </div>
               </Card>
             )}
 
-            {/* Existing Prospects */}
+            {/* Existing Prospects - image-first cards */}
             {prospects.map((prospect) => (
               <Card
                 key={prospect.id}
-                className="p-6 hover:shadow-lg transition-all cursor-pointer"
-                onClick={() => handleProspectSelect(prospect.id)}
+                className="overflow-hidden hover:shadow-lg transition-all cursor-pointer flex flex-col"
+                onClick={() => setSelectedProspect(prospect)}
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg mb-2">{prospect.name}</h3>
-                    <Badge variant={getDifficultyBadgeVariant(prospect.difficultyTier)} className="mb-2">
-                      {prospect.difficultyTier.charAt(0).toUpperCase() + prospect.difficultyTier.slice(1)}
+                <div className={`relative aspect-square min-h-[200px] ${getCardAccentClasses(prospect.difficultyTier)} flex items-center justify-center p-4`}>
+                  <img
+                    src={resolveProspectAvatarUrl(prospect.id, prospect.name, prospect.avatarUrl)}
+                    alt={prospect.name}
+                    className="size-full object-cover rounded-lg"
+                  />
+                  <div className="absolute bottom-2 left-2">
+                    <Badge variant="secondary" className="text-xs font-medium shadow-sm">
+                      {getCallTypeTag(prospect.difficultyTier)}
                     </Badge>
-                    {prospect.positionDescription && (
-                      <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
-                        {prospect.positionDescription}
-                      </p>
-                    )}
                   </div>
                 </div>
-                <Button variant="outline" className="w-full" onClick={(e) => {
-                  e.stopPropagation();
-                  handleProspectSelect(prospect.id);
-                }}>
-                  Select Prospect
-                </Button>
+                <div className="p-4 flex-1 flex flex-col">
+                  <h3 className="font-bold text-lg mb-0.5">{prospect.name}</h3>
+                  <p className="text-sm text-muted-foreground line-clamp-1 mb-3">
+                    {prospect.positionDescription ? getShortTitle(prospect) : getModeLabel(prospect.difficultyTier)}
+                  </p>
+                  <div className="mt-auto flex items-center gap-2">
+                    <span className={`size-2 rounded-full shrink-0 ${getCardAccentBullet(prospect.difficultyTier)}`} aria-hidden />
+                    <span className="text-xs font-medium text-muted-foreground">{getModeLabel(prospect.difficultyTier)}</span>
+                  </div>
+                </div>
               </Card>
             ))}
           </div>

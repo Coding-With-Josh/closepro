@@ -5,8 +5,6 @@ import { db } from '@/db';
 import { roleplaySessions, roleplayMessages, roleplayAnalysis } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { analyzeCall } from '@/lib/ai/analysis';
-import { shouldBypassSubscription } from '@/lib/dev-mode';
-import { generateMockAnalysis } from '@/lib/ai/mock-analysis';
 
 /**
  * POST - Score a completed roleplay session
@@ -79,26 +77,22 @@ export async function POST(
 
     const transcriptJson = { utterances };
 
-    // Analyze the roleplay using the same analysis engine as real calls
+    // Analyze the roleplay using the same analysis engine (Groq or Anthropic; no mock fallback)
     let analysisResult;
     try {
       analysisResult = await analyzeCall(transcript, transcriptJson);
     } catch (analysisError: any) {
       console.error('Analysis error:', analysisError);
-      
-      // In dev mode, use mock analysis as fallback
-      if (shouldBypassSubscription()) {
-        console.log('Using mock analysis (dev mode fallback)');
-        analysisResult = generateMockAnalysis(transcript, transcriptJson);
-      } else {
-        // Return a more helpful error message
-        return NextResponse.json(
-          { 
-            error: `Analysis failed: ${analysisError.message || 'Unknown error'}. Please check your AI API keys (GROQ_API_KEY or ANTHROPIC_API_KEY) are configured in your .env file.` 
-          },
-          { status: 500 }
-        );
-      }
+      const msg = analysisError?.message ?? '';
+      const isCreditError = /credit|balance|too low|payment|upgrade/i.test(msg) || (analysisError?.status === 400);
+      return NextResponse.json(
+        {
+          error: isCreditError
+            ? 'AI scoring is unavailable: your API credit balance is too low. Add credits in Plans & Billing, or set GROQ_API_KEY for a free-tier alternative.'
+            : `Analysis failed: ${msg || 'Unknown error'}. Ensure GROQ_API_KEY or ANTHROPIC_API_KEY is set in .env.`,
+        },
+        { status: isCreditError ? 402 : 500 }
+      );
     }
 
     // Save analysis to roleplay_analysis (not call_analysis — FK to roleplay_sessions)

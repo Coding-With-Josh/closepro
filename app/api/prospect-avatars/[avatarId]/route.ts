@@ -129,6 +129,7 @@ export async function PATCH(
     if (body.authorityLevel !== undefined) updateData.authorityLevel = body.authorityLevel;
     if (body.funnelContext !== undefined) updateData.funnelContext = body.funnelContext;
     if (body.executionResistance !== undefined) updateData.executionResistance = body.executionResistance;
+    if (body.avatarUrl !== undefined) updateData.avatarUrl = body.avatarUrl;
     if (body.positionDescription !== undefined) updateData.positionDescription = body.positionDescription;
     if (body.problems !== undefined) updateData.problems = JSON.stringify(body.problems);
     if (body.painDrivers !== undefined) updateData.painDrivers = JSON.stringify(body.painDrivers);

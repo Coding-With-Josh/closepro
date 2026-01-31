@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { Header } from '@/components/dashboard/header';
@@ -10,6 +10,56 @@ import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TourProvider, TourOverlay, TourStepCard, TourAutoStart } from '@/components/tour';
 import { ErrorBoundary } from '@/components/error-boundary';
+
+const SEGMENT_LABELS: Record<string, string> = {
+  dashboard: 'Dashboard',
+  performance: 'Performance',
+  figures: 'Figures',
+  calls: 'Calls',
+  new: 'New',
+  roleplay: 'AI Roleplay',
+  prospect: 'Prospect Selection',
+  prospects: 'Prospects',
+  results: 'Results',
+  offers: 'Offers',
+  'prospect-avatars': 'Prospect Avatars',
+  team: 'Team',
+  manager: 'Manager',
+  categories: 'Categories',
+  insights: 'Insights',
+  reps: 'Reps',
+  profile: 'Profile',
+  settings: 'Settings',
+  billing: 'Billing',
+  'create-organization': 'Create Organization',
+  edit: 'Edit',
+  review: 'Review',
+};
+
+function getBreadcrumbsFromPathname(pathname: string | null): Array<{ label: string; href?: string }> {
+  if (!pathname || !pathname.startsWith('/dashboard')) {
+    return [{ label: 'Overview', href: '/dashboard' }, { label: 'Dashboard' }];
+  }
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length <= 1) {
+    return [{ label: 'Overview', href: '/dashboard' }, { label: 'Dashboard' }];
+  }
+  const crumbs: Array<{ label: string; href?: string }> = [
+    { label: 'Overview', href: '/dashboard' },
+  ];
+  for (let i = 1; i < segments.length; i++) {
+    const segment = segments[i];
+    const href = '/' + segments.slice(0, i + 1).join('/');
+    const label = SEGMENT_LABELS[segment] ?? segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ');
+    const isLast = i === segments.length - 1;
+    if (isLast) {
+      crumbs.push({ label });
+    } else {
+      crumbs.push({ label, href });
+    }
+  }
+  return crumbs;
+}
 
 export default function DashboardLayout({
   children,
@@ -57,6 +107,8 @@ export default function DashboardLayout({
   const userName = user?.name || session?.user?.name || 'User';
   const userEmail = user?.email || session?.user?.email || 'user@example.com';
   const userAvatar = user?.avatar || null;
+
+  const breadcrumbs = useMemo(() => getBreadcrumbsFromPathname(pathname ?? null), [pathname]);
 
   // Check if we're in a roleplay session (arena mode)
   const isRoleplaySession = pathname?.includes('/roleplay/') && pathname?.match(/\/roleplay\/[^/]+$/);
@@ -109,6 +161,7 @@ export default function DashboardLayout({
 
       <div className="flex-1 flex flex-col overflow-hidden relative z-10 min-w-0">
         <Header
+          breadcrumbs={breadcrumbs}
           userName={userName}
           userEmail={userEmail}
           userAvatar={userAvatar}

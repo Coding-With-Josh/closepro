@@ -2,8 +2,64 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { db } from '@/db';
-import { salesCalls, callAnalysis, roleplaySessions, roleplayAnalysis } from '@/db/schema';
-import { eq, and, gte, desc } from 'drizzle-orm';
+import { salesCalls, callAnalysis, roleplaySessions, roleplayAnalysis, offers } from '@/db/schema';
+import { eq, and, gte, lt, lte, desc } from 'drizzle-orm';
+
+export type PerformanceRange = 'this_week' | 'this_month' | 'last_month' | 'last_quarter' | 'last_year';
+
+function getRangeDates(range: string): { start: Date; end: Date; label: string } {
+  const now = new Date();
+  const start = new Date(now);
+  let end = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+
+  switch (range) {
+    case 'this_week': {
+      const day = start.getDay();
+      const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+      start.setDate(diff);
+      return { start, end, label: 'This Week' };
+    }
+    case 'this_month':
+      start.setDate(1);
+      return { start, end, label: 'This Month' };
+    case 'last_month': {
+      start.setMonth(start.getMonth() - 1);
+      start.setDate(1);
+      end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+      return { start, end, label: 'Last Month' };
+    }
+    case 'last_quarter': {
+      const q = Math.floor(now.getMonth() / 3) + 1;
+      const prevQ = q - 1;
+      const year = prevQ <= 0 ? now.getFullYear() - 1 : now.getFullYear();
+      const quarterStartMonth = prevQ <= 0 ? (prevQ + 4) * 3 - 3 : prevQ * 3 - 3;
+      start.setFullYear(year);
+      start.setMonth(quarterStartMonth);
+      start.setDate(1);
+      end.setFullYear(year);
+      end.setMonth(quarterStartMonth + 2);
+      end.setDate(new Date(year, quarterStartMonth + 3, 0).getDate());
+      end.setHours(23, 59, 59, 999);
+      return { start, end, label: 'Last Quarter' };
+    }
+    case 'last_year':
+      start.setFullYear(start.getFullYear() - 1);
+      start.setMonth(0);
+      start.setDate(1);
+      end.setFullYear(now.getFullYear() - 1);
+      end.setMonth(11);
+      end.setDate(31);
+      end.setHours(23, 59, 59, 999);
+      return { start, end, label: 'Last Year' };
+    default: {
+      const days = parseInt(range, 10) || 30;
+      start.setDate(start.getDate() - days);
+      return { start, end, label: `${days} days` };
+    }
+  }
+}
 
 /**
  * Get current user's performance data
@@ -22,16 +78,20 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const days = parseInt(searchParams.get('days') || '30');
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    const rangeParam = searchParams.get('range') || searchParams.get('days') || 'this_month';
+    const rangeLabel =
+      ['this_week', 'this_month', 'last_month', 'last_quarter', 'last_year'].includes(rangeParam)
+        ? rangeParam
+        : undefined;
+    const { start: startDate, end: endDate, label: periodLabel } = getRangeDates(rangeParam);
 
     const userId = session.user.id;
 
-    // Fetch call analyses
+    // Fetch call analyses (optionally with offer for breakdowns if column exists)
     const callAnalysesRaw = await db
       .select({
         id: callAnalysis.id,
+        callId: salesCalls.id,
         overallScore: callAnalysis.overallScore,
         valueScore: callAnalysis.valueScore,
         trustScore: callAnalysis.trustScore,
@@ -45,7 +105,8 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           eq(salesCalls.userId, userId),
-          gte(salesCalls.createdAt, startDate)
+          gte(salesCalls.createdAt, startDate),
+          lte(salesCalls.createdAt, endDate)
         )
       )
       .orderBy(desc(salesCalls.createdAt));
@@ -68,10 +129,11 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Fetch roleplay analyses
+    // Fetch roleplay analyses with offer and difficulty
     const roleplayAnalysesRaw = await db
       .select({
         id: roleplayAnalysis.id,
+        sessionId: roleplaySessions.id,
         overallScore: roleplayAnalysis.overallScore,
         valueScore: roleplayAnalysis.valueScore,
         trustScore: roleplayAnalysis.trustScore,
@@ -79,13 +141,20 @@ export async function GET(request: NextRequest) {
         logisticsScore: roleplayAnalysis.logisticsScore,
         skillScores: roleplayAnalysis.skillScores,
         createdAt: roleplaySessions.createdAt,
+        offerId: roleplaySessions.offerId,
+        offerCategory: offers.offerCategory,
+        offerName: offers.name,
+        selectedDifficulty: roleplaySessions.selectedDifficulty,
+        actualDifficultyTier: roleplaySessions.actualDifficultyTier,
       })
       .from(roleplayAnalysis)
       .innerJoin(roleplaySessions, eq(roleplayAnalysis.roleplaySessionId, roleplaySessions.id))
+      .leftJoin(offers, eq(roleplaySessions.offerId, offers.id))
       .where(
         and(
           eq(roleplaySessions.userId, userId),
-          gte(roleplaySessions.createdAt, startDate)
+          gte(roleplaySessions.createdAt, startDate),
+          lte(roleplaySessions.createdAt, endDate)
         )
       )
       .orderBy(desc(roleplaySessions.createdAt));
@@ -222,10 +291,41 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Average skill categories
+    // Average skill categories with trend (first half vs second half within period)
+    const categoryScoresByAnalysis: Array<Record<string, number>> = [];
+    allAnalyses.forEach(analysis => {
+      const row: Record<string, number> = {};
+      const skillScoresData = analysis.skillScores;
+      if (skillScoresData && Array.isArray(skillScoresData)) {
+        skillScoresData.forEach((skill: { category?: string; subSkills?: Record<string, number> }) => {
+          if (skill?.category) {
+            const subSkillValues = Object.values(skill.subSkills || {}) as number[];
+            row[skill.category] = subSkillValues.length > 0
+              ? subSkillValues.reduce((s, v) => s + v, 0) / subSkillValues.length
+              : 0;
+          }
+        });
+      }
+      categoryScoresByAnalysis.push(row);
+    });
+    const midpoint = Math.floor(allAnalyses.length / 2);
+    const firstHalfRows = categoryScoresByAnalysis.slice(midpoint);
+    const secondHalfRows = categoryScoresByAnalysis.slice(0, midpoint);
+    const categoryTrends: Record<string, number> = {};
+    Object.keys(skillCategoryScores).forEach(cat => {
+      const firstAvg = firstHalfRows.filter(r => r[cat] != null).length > 0
+        ? firstHalfRows.reduce((s, r) => s + (r[cat] ?? 0), 0) / firstHalfRows.filter(r => r[cat] != null).length
+        : 0;
+      const secondAvg = secondHalfRows.filter(r => r[cat] != null).length > 0
+        ? secondHalfRows.reduce((s, r) => s + (r[cat] ?? 0), 0) / secondHalfRows.filter(r => r[cat] != null).length
+        : 0;
+      categoryTrends[cat] = Math.round((secondAvg - firstAvg) * 10) / 10;
+    });
+
     const skillCategories = Object.entries(skillCategoryScores).map(([category, data]) => ({
       category,
       averageScore: Math.round(data.total / (data.count || 1)),
+      trend: (categoryTrends[category] ?? 0) as number,
     })).sort((a, b) => b.averageScore - a.averageScore);
 
     // If no skill categories, use pillar scores as fallback
@@ -236,7 +336,6 @@ export async function GET(request: NextRequest) {
       strengths = skillCategories.slice(0, 3);
       weaknesses = skillCategories.slice(-3).reverse();
     } else if (totalAnalyses > 0) {
-      // Fallback to pillar-based strengths/weaknesses
       const pillarScores = [
         { category: 'Value', averageScore: averageValue },
         { category: 'Trust', averageScore: averageTrust },
@@ -248,8 +347,101 @@ export async function GET(request: NextRequest) {
       weaknesses = pillarScores.slice(-2).reverse().filter(p => p.averageScore > 0);
     }
 
+    // By offer type (offer category)
+    const byOfferType: Record<string, { averageScore: number; count: number }> = {};
+    allAnalyses.forEach(a => {
+      const category = (a as any).offerType ?? (a as any).offerCategory ?? 'unknown';
+      const key = typeof category === 'string' ? category : 'unknown';
+      if (!byOfferType[key]) byOfferType[key] = { averageScore: 0, count: 0 };
+      byOfferType[key].averageScore += a.overallScore ?? 0;
+      byOfferType[key].count += 1;
+    });
+    Object.keys(byOfferType).forEach(k => {
+      const d = byOfferType[k];
+      d.averageScore = d.count > 0 ? Math.round(d.averageScore / d.count) : 0;
+    });
+
+    // By difficulty (roleplay only; calls don't have difficulty in this query)
+    const byDifficulty: Record<string, { averageScore: number; count: number }> = {};
+    allAnalyses.forEach(a => {
+      if (a.type !== 'roleplay') return;
+      const tier = (a as any).actualDifficultyTier ?? (a as any).selectedDifficulty ?? 'unknown';
+      const key = typeof tier === 'string' ? tier : 'unknown';
+      if (!byDifficulty[key]) byDifficulty[key] = { averageScore: 0, count: 0 };
+      byDifficulty[key].averageScore += a.overallScore ?? 0;
+      byDifficulty[key].count += 1;
+    });
+    Object.keys(byDifficulty).forEach(k => {
+      const d = byDifficulty[k];
+      d.averageScore = d.count > 0 ? Math.round(d.averageScore / d.count) : 0;
+    });
+
+    // By offer (specific offer)
+    const byOffer: Array<{ offerId: string; offerName: string; averageScore: number; count: number }> = [];
+    const byOfferMap: Record<string, { name: string; total: number; count: number }> = {};
+    allAnalyses.forEach(a => {
+      const offerId = (a as any).offerId;
+      const name = (a as any).offerName ?? 'Unknown';
+      const key = offerId ?? 'none';
+      if (!byOfferMap[key]) byOfferMap[key] = { name, total: 0, count: 0 };
+      byOfferMap[key].total += a.overallScore ?? 0;
+      byOfferMap[key].count += 1;
+    });
+    Object.entries(byOfferMap).forEach(([id, d]) => {
+      byOffer.push({
+        offerId: id,
+        offerName: d.name,
+        averageScore: d.count > 0 ? Math.round(d.total / d.count) : 0,
+        count: d.count,
+      });
+    });
+    byOffer.sort((a, b) => b.averageScore - a.averageScore);
+
+    // AI insight (template-driven from top/bottom categories and difficulty)
+    const bestCat = skillCategories[0];
+    const worstCat = skillCategories[skillCategories.length - 1];
+    const difficultyKeys = Object.keys(byDifficulty);
+    let aiInsight = '';
+    if (bestCat && worstCat) {
+      aiInsight = `You perform strongest in ${bestCat.category} (${bestCat.averageScore}) and have the most room to improve in ${worstCat.category} (${worstCat.averageScore}).`;
+      if (difficultyKeys.length > 0) {
+        const hardest = difficultyKeys.reduce((prev, k) =>
+          (byDifficulty[k].averageScore ?? 0) < (byDifficulty[prev].averageScore ?? 0) ? k : prev
+        );
+        aiInsight += ` Scores are lowest on ${hardest} prospects.`;
+      }
+    } else if (totalAnalyses > 0) {
+      aiInsight = `You have ${totalAnalyses} session(s) in this period. Keep practicing to see skill breakdowns.`;
+    }
+
+    // Weekly summary (last 7 days) and monthly summary (current month) - template-driven
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const thisMonthStart = new Date();
+    thisMonthStart.setDate(1);
+    thisMonthStart.setHours(0, 0, 0, 0);
+    const weekAnalyses = allAnalyses.filter(a => new Date(a.createdAt) >= weekAgo);
+    const monthAnalyses = allAnalyses.filter(a => new Date(a.createdAt) >= thisMonthStart);
+    const weekAvg = weekAnalyses.length > 0
+      ? Math.round(weekAnalyses.reduce((s, a) => s + (a.overallScore ?? 0), 0) / weekAnalyses.length)
+      : 0;
+    const monthAvg = monthAnalyses.length > 0
+      ? Math.round(monthAnalyses.reduce((s, a) => s + (a.overallScore ?? 0), 0) / monthAnalyses.length)
+      : 0;
+    const weeklySummary = {
+      overview: `Last 7 days: ${weekAnalyses.length} session(s), average score ${weekAvg}.`,
+      skillTrends: skillCategories.length > 0 ? `Top: ${skillCategories[0].category}. Focus: ${skillCategories[skillCategories.length - 1]?.category ?? 'N/A'}.` : '',
+      actionPlan: ['Review lowest-scoring category', 'Practice objection handling', 'Book a roleplay session'].slice(0, 3),
+    };
+    const monthlySummary = {
+      overview: `This month: ${monthAnalyses.length} session(s), average score ${monthAvg}.`,
+      skillTrends: skillCategories.length > 0 ? `Best: ${skillCategories[0].category}. Improve: ${skillCategories[skillCategories.length - 1]?.category ?? 'N/A'}.` : '',
+      actionPlan: ['Set a weekly practice goal', 'Compare scores by offer type', 'Export summary for coaching'].slice(0, 3),
+    };
+
     return NextResponse.json({
-      period: `${days} days`,
+      range: rangeLabel ?? rangeParam,
+      period: periodLabel,
       totalAnalyses,
       totalCalls: callAnalyses.length,
       totalRoleplays: roleplayAnalyses.length,
@@ -263,11 +455,18 @@ export async function GET(request: NextRequest) {
       skillCategories,
       strengths,
       weaknesses,
+      byOfferType,
+      byDifficulty,
+      byOffer,
+      aiInsight,
+      weeklySummary,
+      monthlySummary,
       recentAnalyses: allAnalyses.slice(0, 10).map(a => ({
-        id: a.id,
+        id: a.type === 'call' ? (a as any).callId : (a as any).sessionId ?? a.id,
         type: a.type,
         overallScore: a.overallScore,
         createdAt: a.createdAt,
+        difficultyTier: (a as any).actualDifficultyTier ?? (a as any).selectedDifficulty ?? null,
       })),
     });
   } catch (error) {

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Play, Clock, TrendingUp, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
+import { EmptyRoleplayIllustration } from '@/components/illustrations';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface RoleplaySession {
@@ -117,11 +118,16 @@ export default function RoleplayPage() {
     <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">AI Roleplay</h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            Practice sales calls with AI prospects
-          </p>
+        <div className="flex items-start gap-4">
+          <div className="hidden sm:block shrink-0 w-14 h-14 text-muted-foreground/70">
+            <EmptyRoleplayIllustration className="w-full h-full" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold">AI Roleplay</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">
+              Practice sales calls with AI prospects
+            </p>
+          </div>
         </div>
         <Link href="/dashboard/roleplay/new" className="w-full sm:w-auto">
           <Button size="lg" className="gap-2 w-full sm:w-auto">
@@ -193,8 +199,8 @@ export default function RoleplayPage() {
             <div className="p-8 sm:p-12">
               <Empty>
                 <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <MessageSquare className="size-6" />
+                  <EmptyMedia variant="illustration" className="size-32">
+                    <EmptyRoleplayIllustration className="size-full max-w-[8rem] max-h-[8rem]" />
                   </EmptyMedia>
                   <EmptyTitle>No roleplay sessions yet</EmptyTitle>
                   <EmptyDescription>Start your first AI roleplay to practice and get scored.</EmptyDescription>

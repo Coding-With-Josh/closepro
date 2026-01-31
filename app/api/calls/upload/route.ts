@@ -114,10 +114,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Store metadata
-    const callMetadata = {
-      ...(metadata ? JSON.parse(metadata) : {}),
-    };
+    // Store metadata; addToFigures (default true) controls whether this call counts in figures
+    let callMetadata: Record<string, unknown> = {};
+    try {
+      if (metadata) callMetadata = JSON.parse(metadata);
+    } catch {
+      // ignore invalid JSON
+    }
+    const addToFigures = callMetadata.addToFigures !== false;
+    const analysisIntent = addToFigures ? 'update_figures' : 'analysis_only';
 
     // Create call record with transcript ready
     const [call] = await db
@@ -133,6 +138,7 @@ export async function POST(request: NextRequest) {
         duration: transcriptionResult.duration,
         status: 'analyzing', // Ready for analysis immediately
         metadata: JSON.stringify(callMetadata),
+        analysisIntent,
       })
       .returning();
 
@@ -214,14 +220,36 @@ async function analyzeCallAsync(
         timestampedFeedback: JSON.stringify(analysisResult.timestampedFeedback),
       });
 
-    // Update call status to completed
-    await db
-      .update(salesCalls)
-      .set({
+    // If analysisIntent is update_figures, write AI-suggested outcome to salesCalls
+    const [callRow] = await db.select({ analysisIntent: salesCalls.analysisIntent }).from(salesCalls).where(eq(salesCalls.id, callId)).limit(1);
+    const outcome = analysisResult.outcome;
+    const hasOutcome = outcome && (
+      outcome.result != null ||
+      outcome.qualified !== undefined ||
+      outcome.cashCollected != null ||
+      outcome.revenueGenerated != null ||
+      (outcome.reasonForOutcome != null && outcome.reasonForOutcome.trim() !== '')
+    );
+    if (callRow?.analysisIntent === 'update_figures' && hasOutcome) {
+      const updatePayload: Record<string, unknown> = {
         status: 'completed',
         completedAt: new Date(),
-      })
-      .where(eq(salesCalls.id, callId));
+      };
+      if (outcome!.result) updatePayload.result = outcome!.result;
+      if (outcome!.qualified !== undefined) updatePayload.qualified = outcome!.qualified;
+      if (outcome!.cashCollected !== undefined) updatePayload.cashCollected = outcome!.cashCollected;
+      if (outcome!.revenueGenerated !== undefined) updatePayload.revenueGenerated = outcome!.revenueGenerated;
+      if (outcome!.reasonForOutcome?.trim()) updatePayload.reasonForOutcome = outcome!.reasonForOutcome.trim();
+      await db.update(salesCalls).set(updatePayload as any).where(eq(salesCalls.id, callId));
+    } else {
+      await db
+        .update(salesCalls)
+        .set({
+          status: 'completed',
+          completedAt: new Date(),
+        })
+        .where(eq(salesCalls.id, callId));
+    }
   } catch (error: any) {
     console.error('Background analysis error:', error);
     // Mark as failed

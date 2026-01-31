@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { db } from '@/db';
-import { salesCalls, users, organizations, userOrganizations } from '@/db/schema';
+import { salesCalls, users, userOrganizations } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
 /**
@@ -74,20 +74,39 @@ export async function POST(request: NextRequest) {
       organizationId = firstOrg[0].organizationId;
     }
 
-    // Note: Manual logs update figures/trends but do NOT create a salesCalls record
-    // This is intentional per the spec - manual logs are for quick figure updates only
-    
-    // In a real implementation, you would update your figures/trends tables here
-    // For now, we'll just return success
-    
+    const callDate = date ? new Date(date) : new Date();
+    if (isNaN(callDate.getTime())) {
+      return NextResponse.json(
+        { error: 'Invalid date' },
+        { status: 400 }
+      );
+    }
+
+    await db.insert(salesCalls).values({
+      organizationId,
+      userId: session.user.id,
+      fileName: 'manual',
+      fileUrl: '',
+      status: 'manual',
+      offerId: offerId || null,
+      offerType: offerType || null,
+      callType: callType || null,
+      result: result || null,
+      qualified: qualified ?? null,
+      cashCollected: cashCollected != null ? Number(cashCollected) : null,
+      revenueGenerated: revenueGenerated != null ? Number(revenueGenerated) : null,
+      depositTaken: depositTaken ?? null,
+      reasonForOutcome: reasonForOutcome || null,
+      callDate,
+    });
+
     return NextResponse.json({
       message: 'Call logged successfully (figures updated)',
-      note: 'Manual logs do not appear in call history',
     }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error logging manual call:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to log call' },
+      { error: error instanceof Error ? error.message : 'Failed to log call' },
       { status: 500 }
     );
   }

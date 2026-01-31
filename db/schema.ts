@@ -269,7 +269,8 @@ export const salesCalls = pgTable('sales_calls', {
   wasConfirmed: boolean('was_confirmed'), // For no-shows
   bookingSource: text('booking_source'), // For no-shows
   originalCallId: uuid('original_call_id').references(() => salesCalls.id, { onDelete: 'set null' }), // For follow-ups
-  
+  callDate: timestamp('call_date'), // For manual backdating; figures use this for month attribution when set
+
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   completedAt: timestamp('completed_at'),
@@ -385,6 +386,7 @@ export const prospectAvatars = pgTable('prospect_avatars', {
   difficultyTier: text('difficulty_tier').notNull(), // 'easy', 'realistic', 'hard', 'elite', 'near_impossible'
   
   // Prospect Profile Details
+  avatarUrl: text('avatar_url'), // Optional: NanoBanana or other human-style portrait URL
   positionDescription: text('position_description'), // Current situation
   problems: text('problems'), // JSON array
   painDrivers: text('pain_drivers'), // JSON array

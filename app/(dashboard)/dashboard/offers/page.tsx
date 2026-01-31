@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Package } from 'lucide-react';
 import Link from 'next/link';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
+import { EmptyOffersIllustration } from '@/components/illustrations';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface Offer {
@@ -87,11 +88,16 @@ export default function OffersPage() {
     <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Offers</h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            Manage your sales offers for roleplays
-          </p>
+        <div className="flex items-start gap-4">
+          <div className="hidden sm:block shrink-0 w-14 h-14 text-muted-foreground/70">
+            <EmptyOffersIllustration className="w-full h-full" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold">Offers</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">
+              Manage your sales offers for roleplays
+            </p>
+          </div>
         </div>
         <Button 
           className="w-full sm:w-auto"
@@ -110,8 +116,8 @@ export default function OffersPage() {
         <Card className="p-8 sm:p-12">
           <Empty>
             <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <Package className="size-6" />
+              <EmptyMedia variant="illustration" className="size-32">
+                <EmptyOffersIllustration className="size-full max-w-[8rem] max-h-[8rem]" />
               </EmptyMedia>
               <EmptyTitle>No offers yet</EmptyTitle>
               <EmptyDescription>Create your first offer to start using it in roleplays</EmptyDescription>

@@ -79,6 +79,17 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error fetching prospect avatars:', error);
+    const msg = error?.message ?? '';
+    const code = error?.code ?? error?.errno;
+    if (msg.includes('session') || msg.includes('Failed to get session') || error?.name === 'APIError') {
+      return NextResponse.json({ error: 'Session unavailable. Please sign in again.' }, { status: 401 });
+    }
+    if (code === 'EHOSTUNREACH' || code === 'ECONNREFUSED' || code === 'ETIMEDOUT') {
+      return NextResponse.json(
+        { error: 'Service temporarily unreachable. Check BETTER_AUTH_URL and database connectivity.' },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: error.message || 'Failed to fetch avatars' },
       { status: 500 }

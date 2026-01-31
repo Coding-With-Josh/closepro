@@ -1,16 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Target, Shield, Package, Truck, TrendingUp, TrendingDown, Minus, Phone, Bot, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { TrendingUp, TrendingDown, Minus, Phone, Bot, ArrowLeft, Loader2, AlertCircle, Download, Lightbulb } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+const RANGE_OPTIONS = [
+  { value: 'this_week', label: 'This Week' },
+  { value: 'this_month', label: 'This Month' },
+  { value: 'last_month', label: 'Last Month' },
+  { value: 'last_quarter', label: 'Last Quarter' },
+  { value: 'last_year', label: 'Last Year' },
+] as const;
+
 interface PerformanceData {
+  range?: string;
   period: string;
   totalAnalyses: number;
   totalCalls: number;
@@ -22,33 +30,49 @@ interface PerformanceData {
   averageLogistics: number;
   trend: 'improving' | 'declining' | 'neutral';
   weeklyData: Array<{ week: string; score: number; count: number }>;
-  skillCategories: Array<{ category: string; averageScore: number }>;
+  skillCategories: Array<{ category: string; averageScore: number; trend?: number }>;
   strengths: Array<{ category: string; averageScore: number }>;
   weaknesses: Array<{ category: string; averageScore: number }>;
+  byOfferType?: Record<string, { averageScore: number; count: number }>;
+  byDifficulty?: Record<string, { averageScore: number; count: number }>;
+  byOffer?: Array<{ offerId: string; offerName: string; averageScore: number; count: number }>;
+  aiInsight?: string;
+  weeklySummary?: { overview: string; skillTrends: string; actionPlan: string[] };
+  monthlySummary?: { overview: string; skillTrends: string; actionPlan: string[] };
   recentAnalyses: Array<{
     id: string;
     type: 'call' | 'roleplay';
     overallScore: number;
     createdAt: string;
+    difficultyTier?: string | null;
   }>;
 }
+
+const OFFER_TYPE_LABELS: Record<string, string> = {
+  b2c_health: 'B2C Health',
+  b2c_relationships: 'B2C Relationships',
+  b2c_wealth: 'B2C Wealth',
+  mixed_wealth: 'Mixed Wealth',
+  b2b_services: 'B2B Services',
+  unknown: 'Unknown',
+};
 
 export default function PerformancePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [performance, setPerformance] = useState<PerformanceData | null>(null);
-  const [period, setPeriod] = useState('30');
+  const [range, setRange] = useState<string>('this_month');
 
   useEffect(() => {
     fetchPerformance();
-  }, [period]);
+  }, [range]);
 
   const fetchPerformance = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/performance?days=${period}`);
+      const response = await fetch(`/api/performance?range=${range}`);
       if (!response.ok) {
         throw new Error('Failed to fetch performance data');
       }
@@ -60,6 +84,32 @@ export default function PerformancePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDownloadSummary = () => {
+    if (!performance || !summaryPrintRef.current) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const period = performance.period;
+    const content = `
+      <!DOCTYPE html>
+      <html>
+        <head><title>Performance Summary - ${period}</title></head>
+        <body style="font-family: system-ui; padding: 24px; max-width: 640px;">
+          <h1>Performance Summary</h1>
+          <p><strong>Period:</strong> ${period}</p>
+          <p><strong>Sessions:</strong> ${performance.totalAnalyses} (${performance.totalCalls} calls, ${performance.totalRoleplays} roleplays)</p>
+          <p><strong>Average Score:</strong> ${performance.averageOverall}</p>
+          ${performance.weeklySummary ? `<h2>This Week</h2><p>${performance.weeklySummary.overview}</p><p>${performance.weeklySummary.skillTrends}</p><ul>${(performance.weeklySummary.actionPlan || []).map(a => `<li>${a}</li>`).join('')}</ul>` : ''}
+          ${performance.monthlySummary ? `<h2>This Month</h2><p>${performance.monthlySummary.overview}</p><p>${performance.monthlySummary.skillTrends}</p><ul>${(performance.monthlySummary.actionPlan || []).map(a => `<li>${a}</li>`).join('')}</ul>` : ''}
+          ${performance.aiInsight ? `<h2>Insight</h2><p>${performance.aiInsight}</p>` : ''}
+        </body>
+      </html>
+    `;
+    printWindow.document.write(content);
+    printWindow.document.close();
+    printWindow.print();
+    printWindow.onafterprint = () => printWindow.close();
   };
 
   const getScoreColor = (score: number) => {
@@ -138,15 +188,16 @@ export default function PerformancePage() {
             Track your sales performance over time
           </p>
         </div>
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-full sm:w-[150px]">
-            <SelectValue />
+        <Select value={range} onValueChange={setRange}>
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue placeholder="Time range" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="7">Last 7 days</SelectItem>
-            <SelectItem value="30">Last 30 days</SelectItem>
-            <SelectItem value="90">Last 90 days</SelectItem>
-            <SelectItem value="365">Last year</SelectItem>
+            {RANGE_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -155,7 +206,7 @@ export default function PerformancePage() {
       <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
         <CardHeader>
           <CardTitle>Overall Performance</CardTitle>
-          <CardDescription>Your average scores over the last {performance.period}</CardDescription>
+          <CardDescription>Based on {performance.period}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -215,7 +266,7 @@ export default function PerformancePage() {
               )}
             </div>
             <div className="text-center p-4 rounded-lg bg-muted/30">
-              <p className="text-sm text-muted-foreground mb-2">Focus Area</p>
+              <p className="text-sm text-muted-foreground mb-2">Biggest Improvement Opportunity</p>
               {performance.weaknesses.length > 0 ? (
                 <>
                   <p className="text-2xl font-bold truncate" title={performance.weaknesses[0].category}>
@@ -297,96 +348,119 @@ export default function PerformancePage() {
         </CardContent>
       </Card>
 
-      {/* Sales Fundamental Metrics */}
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Sales Fundamental Metrics</h2>
-        <p className="text-sm text-muted-foreground mb-4">
-          Overall metrics for calls on (closer/lead)
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className={`border-2 ${getScoreBg(performance.averageValue)}`}>
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-primary" />
-                <CardTitle className="text-sm font-semibold">Value</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className={`text-3xl font-bold ${getScoreColor(performance.averageValue)}`}>
-                {performance.averageValue}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Communication score</p>
-            </CardContent>
-          </Card>
-
-          <Card className={`border-2 ${getScoreBg(performance.averageTrust)}`}>
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-primary" />
-                <CardTitle className="text-sm font-semibold">Trust</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className={`text-3xl font-bold ${getScoreColor(performance.averageTrust)}`}>
-                {performance.averageTrust}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Building score</p>
-            </CardContent>
-          </Card>
-
-          <Card className={`border-2 ${getScoreBg(performance.averageFit)}`}>
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Package className="h-5 w-5 text-primary" />
-                <CardTitle className="text-sm font-semibold">Fit</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className={`text-3xl font-bold ${getScoreColor(performance.averageFit)}`}>
-                {performance.averageFit}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Confirmation score</p>
-            </CardContent>
-          </Card>
-
-          <Card className={`border-2 ${getScoreBg(performance.averageLogistics)}`}>
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Truck className="h-5 w-5 text-primary" />
-                <CardTitle className="text-sm font-semibold">Logistics</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className={`text-3xl font-bold ${getScoreColor(performance.averageLogistics)}`}>
-                {performance.averageLogistics}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Handling score</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* 10 Skill Categories */}
+      {/* Sales Skill Breakdown (10 categories from API) */}
       {performance.skillCategories.length > 0 && (
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Skill Categories</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {performance.skillCategories.slice(0, 10).map((skill, idx) => (
-              <Card key={idx} className={`border-2 ${getScoreBg(skill.averageScore)}`}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold truncate" title={skill.category}>
-                    {skill.category}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className={`text-2xl font-bold ${getScoreColor(skill.averageScore)}`}>
-                    {skill.averageScore}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+        <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
+          <CardHeader>
+            <CardTitle>Sales Skill Breakdown</CardTitle>
+            <CardDescription>Average score and trend per category (from analyses)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {performance.skillCategories.map((skill, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
+                  <p className="font-medium">{skill.category}</p>
+                  <div className="flex items-center gap-3">
+                    {typeof skill.trend === 'number' && skill.trend !== 0 && (
+                      <span className={`text-xs flex items-center gap-0.5 ${skill.trend > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        {skill.trend > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                        {skill.trend > 0 ? '+' : ''}{skill.trend}
+                      </span>
+                    )}
+                    <div className="w-32 bg-muted h-2 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          skill.averageScore >= 80 ? 'bg-green-500' :
+                          skill.averageScore >= 60 ? 'bg-blue-500' :
+                          skill.averageScore >= 40 ? 'bg-orange-500' :
+                          'bg-red-500'
+                        }`}
+                        style={{ width: `${skill.averageScore}%` }}
+                      />
+                    </div>
+                    <span className={`text-lg font-bold w-12 text-right ${getScoreColor(skill.averageScore)}`}>
+                      {skill.averageScore}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Breakdowns: by offer type, difficulty, offer */}
+      {(performance.byOfferType && Object.keys(performance.byOfferType).length > 0) ||
+       (performance.byDifficulty && Object.keys(performance.byDifficulty).length > 0) ||
+       (performance.byOffer && performance.byOffer.length > 0) ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {performance.byOfferType && Object.keys(performance.byOfferType).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">By Offer Type</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Object.entries(performance.byOfferType).map(([k, v]) => (
+                    <div key={k} className="flex justify-between text-sm">
+                      <span>{OFFER_TYPE_LABELS[k] ?? k}</span>
+                      <span className="font-medium">{v.averageScore} ({v.count})</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {performance.byDifficulty && Object.keys(performance.byDifficulty).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">By Prospect Difficulty</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Object.entries(performance.byDifficulty).map(([k, v]) => (
+                    <div key={k} className="flex justify-between text-sm capitalize">
+                      <span>{k}</span>
+                      <span className="font-medium">{v.averageScore} ({v.count})</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {performance.byOffer && performance.byOffer.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">By Offer</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {performance.byOffer.slice(0, 8).map((o) => (
+                    <div key={o.offerId} className="flex justify-between text-sm gap-2">
+                      <span className="truncate" title={o.offerName}>{o.offerName}</span>
+                      <span className="font-medium shrink-0">{o.averageScore} ({o.count})</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
+      ) : null}
+
+      {/* AI Insight */}
+      {performance.aiInsight && (
+        <Card className="border border-amber-500/30 bg-amber-500/5">
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Lightbulb className="h-4 w-4" />
+              Insight
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">{performance.aiInsight}</p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Strengths & Weaknesses */}
@@ -433,8 +507,8 @@ export default function PerformancePage() {
 
         <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
           <CardHeader>
-            <CardTitle className="text-red-500">Focus Areas</CardTitle>
-            <CardDescription>Categories that need improvement</CardDescription>
+            <CardTitle className="text-red-500">Biggest Focus Areas</CardTitle>
+            <CardDescription>Bottom categories to improve (data-backed)</CardDescription>
           </CardHeader>
           <CardContent>
             {performance.weaknesses.length > 0 ? (
@@ -472,37 +546,52 @@ export default function PerformancePage() {
         </Card>
       </div>
 
-      {/* Skill Categories */}
-      {performance.skillCategories.length > 0 && (
+      {/* Weekly & Monthly Summary + PDF export */}
+      {(performance.weeklySummary || performance.monthlySummary) && (
         <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
-          <CardHeader>
-            <CardTitle>All Skill Categories</CardTitle>
-            <CardDescription>Average scores across all skill categories</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {performance.skillCategories.map((skill, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
-                  <p className="font-medium">{skill.category}</p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-32 bg-muted h-2 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          skill.averageScore >= 80 ? 'bg-green-500' :
-                          skill.averageScore >= 60 ? 'bg-blue-500' :
-                          skill.averageScore >= 40 ? 'bg-orange-500' :
-                          'bg-red-500'
-                        }`}
-                        style={{ width: `${skill.averageScore}%` }}
-                      />
-                    </div>
-                    <span className={`text-lg font-bold w-12 text-right ${getScoreColor(skill.averageScore)}`}>
-                      {skill.averageScore}
-                    </span>
-                  </div>
-                </div>
-              ))}
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Summaries</CardTitle>
+              <CardDescription>This week and this month overview</CardDescription>
             </div>
+            <Button variant="outline" size="sm" onClick={handleDownloadSummary} className="shrink-0">
+              <Download className="h-4 w-4 mr-2" />
+              Download summary (PDF)
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {performance.weeklySummary && (
+              <div>
+                <h3 className="text-sm font-semibold mb-1">This week</h3>
+                <p className="text-sm text-muted-foreground">{performance.weeklySummary.overview}</p>
+                {performance.weeklySummary.skillTrends && (
+                  <p className="text-sm text-muted-foreground mt-1">{performance.weeklySummary.skillTrends}</p>
+                )}
+                {performance.weeklySummary.actionPlan?.length ? (
+                  <ul className="list-disc list-inside text-sm mt-2 space-y-0.5">
+                    {performance.weeklySummary.actionPlan.map((a, i) => (
+                      <li key={i}>{a}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            )}
+            {performance.monthlySummary && (
+              <div>
+                <h3 className="text-sm font-semibold mb-1">This month</h3>
+                <p className="text-sm text-muted-foreground">{performance.monthlySummary.overview}</p>
+                {performance.monthlySummary.skillTrends && (
+                  <p className="text-sm text-muted-foreground mt-1">{performance.monthlySummary.skillTrends}</p>
+                )}
+                {performance.monthlySummary.actionPlan?.length ? (
+                  <ul className="list-disc list-inside text-sm mt-2 space-y-0.5">
+                    {performance.monthlySummary.actionPlan.map((a, i) => (
+                      <li key={i}>{a}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

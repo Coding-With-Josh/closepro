@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Upload, FileAudio, Loader2, CheckCircle2, AlertCircle, X, Search, Filter, Trash2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
+import { EmptyCallsIllustration } from '@/components/illustrations';
 
 export default function CallAnalysisReviewPage() {
   const router = useRouter();
@@ -127,8 +128,8 @@ export default function CallAnalysisReviewPage() {
           ) : filteredCalls.length === 0 ? (
             <Empty>
               <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <Search className="size-6" />
+                <EmptyMedia variant="illustration" className="size-32">
+                  <EmptyCallsIllustration className="size-full max-w-[8rem] max-h-[8rem]" />
                 </EmptyMedia>
                 <EmptyTitle>No calls match your filters</EmptyTitle>
                 <EmptyDescription>Try clearing or changing your search and filters.</EmptyDescription>

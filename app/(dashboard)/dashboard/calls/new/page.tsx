@@ -61,6 +61,11 @@ export default function NewCallPage() {
     depositTaken: false,
   });
 
+  // Upload form state
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [addToFigures, setAddToFigures] = useState(true);
+  const [uploading, setUploading] = useState(false);
+
   useEffect(() => {
     fetchOffers();
   }, []);
@@ -214,20 +219,52 @@ export default function NewCallPage() {
             <CardHeader>
               <CardTitle>Upload & Analyze Call</CardTitle>
               <CardDescription>
-                Upload an audio file or paste a transcript for AI analysis
+                Upload an audio file for transcription and AI analysis (MP3, WAV, M4A, WebM, max 100MB)
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Upload functionality will be moved here from the main calls page. This will include:
-                AI auto-detection of offer, type, result, and other fields, with user confirmation.
-              </p>
-              <div className="flex gap-3">
-                <Link href="/dashboard/calls">
-                  <Button variant="outline">Cancel</Button>
-                </Link>
-                <Button disabled>Coming Soon</Button>
-              </div>
+              <form onSubmit={handleUploadSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="upload-file">Audio file *</Label>
+                  <Input
+                    id="upload-file"
+                    type="file"
+                    accept="audio/mpeg,audio/mp3,audio/wav,audio/m4a,audio/webm,.mp3,.wav,.m4a,.webm"
+                    onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+                    required
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="upload-add-to-figures"
+                    checked={addToFigures}
+                    onCheckedChange={(checked) => setAddToFigures(checked === true)}
+                  />
+                  <Label htmlFor="upload-add-to-figures" className="font-normal cursor-pointer">
+                    Add to sales figures (include outcome in Performance → Figures)
+                  </Label>
+                </div>
+                <div className="flex gap-3">
+                  <Link href="/dashboard/calls" className="flex-1">
+                    <Button type="button" variant="outline" className="w-full">
+                      Cancel
+                    </Button>
+                  </Link>
+                  <Button type="submit" disabled={uploading || !uploadFile} className="flex-1">
+                    {uploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload & Analyze
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>

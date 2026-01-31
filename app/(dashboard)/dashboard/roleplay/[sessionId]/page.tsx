@@ -264,9 +264,18 @@ function RoleplaySessionContent() {
           setLoading(true);
           if (synthRef.current) synthRef.current.cancel();
           const scoreResponse = await fetch(`/api/roleplay/${sessionId}/score`, { method: 'POST' });
+          const errorData = await scoreResponse.json().catch(() => ({}));
           if (!scoreResponse.ok) {
-            const errorData = await scoreResponse.json().catch(() => ({}));
-            throw new Error(errorData.error || 'Failed to score session');
+            const msg = errorData.error || 'Failed to score session';
+            toastError(msg);
+            // Still end the session and go to results so user can see transcript; results page shows "No analysis" + retry
+            await fetch(`/api/roleplay/${sessionId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 'completed' }),
+            });
+            router.push(`/dashboard/roleplay/${sessionId}/results`);
+            return;
           }
           await fetch(`/api/roleplay/${sessionId}`, {
             method: 'PATCH',
@@ -277,11 +286,7 @@ function RoleplaySessionContent() {
         } catch (error) {
           console.error('Error ending session:', error);
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          if (errorMessage.includes('API keys') || errorMessage.includes('GROQ_API_KEY') || errorMessage.includes('ANTHROPIC_API_KEY')) {
-            toastError(`Setup Required: ${errorMessage} Add GROQ_API_KEY or ANTHROPIC_API_KEY to your .env file to enable scoring.`);
-          } else {
-            toastError('Failed to end session: ' + errorMessage);
-          }
+          toastError('Failed to end session: ' + errorMessage);
         } finally {
           setLoading(false);
         }

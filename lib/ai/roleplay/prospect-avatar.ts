@@ -201,6 +201,46 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+/** Default bio templates per difficulty tier (picked at random for variety) */
+const DEFAULT_BIOS: Record<DifficultyTier, string[]> = {
+  easy: [
+    'Open to change, already sees the value and is leaning yes. Needs a light nudge and clear next step.',
+    'Warm lead with clear pain and budget. Ready to move if the fit is right and timeline works.',
+    'Has done some research and is interested. Looking for reassurance and a simple path forward.',
+  ],
+  realistic: [
+    'Interested but cautious. Has competing priorities and needs to see ROI before committing.',
+    'Sees the problem and is exploring options. Needs clarity on outcomes and a bit of trust-building.',
+    'Mid-funnel: aware of the offer, weighing cost vs benefit. Open to a good conversation.',
+  ],
+  hard: [
+    'Skeptical or price-sensitive. Has been burned before or has strong objections to address.',
+    'Busy decision-maker with many options. Needs to be convinced of fit and urgency.',
+    'Interested in the outcome but resistant on price, timing, or authority. Pushes back on assumptions.',
+  ],
+  elite: [
+    'Expert or advisor-level. Questions the mechanism and wants proof. High bar for credibility.',
+    'Very resistant: budget locked, timeline far out, or decision by committee. Hard close.',
+    'Sophisticated buyer with strong objections and alternatives. Needs exceptional handling.',
+  ],
+  near_impossible: [
+    'Extremely resistant: wrong timing, no budget, or no authority. Would require exceptional persuasion.',
+    'Hostile or disengaged. Multiple blockers and low perceived need. Very difficult to convert.',
+  ],
+};
+
+/**
+ * Return a short default bio (position description) for a difficulty tier.
+ * Picks randomly from templates so generated prospects feel varied.
+ */
+export function getDefaultBioForDifficulty(
+  tier: DifficultyTier | 'realistic' | 'hard' | 'elite' | 'easy'
+): string {
+  const key = tier as DifficultyTier;
+  const options = DEFAULT_BIOS[key] ?? DEFAULT_BIOS.realistic;
+  return options[randomInt(0, options.length - 1)];
+}
+
 /**
  * Generate a random prospect within a difficulty band (50-point model)
  * Ensures total difficulty score falls within selected range

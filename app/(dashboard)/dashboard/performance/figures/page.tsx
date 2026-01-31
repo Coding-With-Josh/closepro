@@ -1,105 +1,79 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, Phone, CheckCircle2, XCircle, TrendingUp, DollarSign, AlertCircle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowLeft, Loader2, Phone, CheckCircle2, TrendingUp, DollarSign, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface FiguresData {
-  totalCallsBooked: number;
-  totalCallsShowed: number;
-  totalCallsNoShow: number;
-  totalCallsQualified: number;
+  month: string;
+  callsBooked: number;
+  callsShowed: number;
+  callsQualified: number;
+  salesMade: number;
   closeRate: number;
-  noShowRate: number;
+  showRate: number;
   qualifiedRate: number;
-  callsClosed: number;
+  cashCollected: number;
   revenueGenerated: number;
+  cashCollectedPct: number;
+}
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+function getDefaultMonthYear(): { month: string; year: number } {
+  const now = new Date();
+  return {
+    month: String(now.getMonth() + 1).padStart(2, '0'),
+    year: now.getFullYear(),
+  };
+}
+
+function toMonthParam(month: string, year: number): string {
+  return `${year}-${month}`;
 }
 
 export default function FiguresPage() {
+  const defaultRange = getDefaultMonthYear();
+  const [month, setMonth] = useState(defaultRange.month);
+  const [year, setYear] = useState(defaultRange.year);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [figures, setFigures] = useState<FiguresData | null>(null);
 
-  useEffect(() => {
-    fetchFigures();
-  }, []);
-
-  const fetchFigures = async () => {
+  const fetchFigures = useCallback(async () => {
+    const monthParam = toMonthParam(month, year);
     try {
       setLoading(true);
       setError(null);
-      
-      // Fetch all calls to calculate figures
-      const response = await fetch('/api/calls');
+      const response = await fetch(`/api/performance/figures?month=${monthParam}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch calls data');
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to fetch figures');
       }
-      
       const data = await response.json();
-      const calls = data.calls || [];
-      
-      // Calculate figures from call analysis data
-      // Note: These would ideally come from a dedicated API endpoint that scrapes call analysis
-      let totalCallsBooked = 0;
-      let totalCallsShowed = 0;
-      let totalCallsNoShow = 0;
-      let totalCallsQualified = 0;
-      let callsClosed = 0;
-      let revenueGenerated = 0;
-      
-      // Fetch analysis for each call to extract metrics
-      for (const call of calls) {
-        if (call.status === 'completed') {
-          try {
-            const analysisResponse = await fetch(`/api/calls/${call.id}/status`);
-            if (analysisResponse.ok) {
-              const analysisData = await analysisResponse.json();
-              const analysis = analysisData.analysis;
-              
-              // Extract metrics from analysis (this would need to be enhanced based on actual data structure)
-              // For now, we'll use placeholder logic - in production, these would be extracted from call analysis
-              totalCallsBooked++;
-              if (analysis) {
-                totalCallsShowed++;
-                // Determine if qualified, closed, etc. from analysis data
-                // This is a placeholder - actual implementation would parse analysis results
-              }
-            }
-          } catch (err) {
-            console.error(`Error fetching analysis for call ${call.id}:`, err);
-          }
-        }
-      }
-      
-      // Calculate rates
-      const closeRate = totalCallsShowed > 0 ? (callsClosed / totalCallsShowed) * 100 : 0;
-      const noShowRate = totalCallsBooked > 0 ? (totalCallsNoShow / totalCallsBooked) * 100 : 0;
-      const qualifiedRate = totalCallsShowed > 0 ? (totalCallsQualified / totalCallsShowed) * 100 : 0;
-      
-      setFigures({
-        totalCallsBooked,
-        totalCallsShowed,
-        totalCallsNoShow,
-        totalCallsQualified,
-        closeRate: Math.round(closeRate * 10) / 10,
-        noShowRate: Math.round(noShowRate * 10) / 10,
-        qualifiedRate: Math.round(qualifiedRate * 10) / 10,
-        callsClosed,
-        revenueGenerated,
-      });
-    } catch (error) {
-      console.error('Error fetching figures:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load figures');
+      setFigures(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load figures');
+      setFigures(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, [month, year]);
 
-  if (loading) {
+  useEffect(() => {
+    fetchFigures();
+  }, [fetchFigures]);
+
+  const years = [year - 2, year - 1, year, year + 1, year + 2].filter((y) => y >= 2020 && y <= 2030);
+
+  if (loading && !figures) {
     return (
       <div className="container mx-auto p-4 sm:p-6">
         <div className="flex flex-col items-center justify-center py-12">
@@ -110,7 +84,7 @@ export default function FiguresPage() {
     );
   }
 
-  if (error) {
+  if (error && !figures) {
     return (
       <div className="container mx-auto p-4 sm:p-6">
         <Card className="border-destructive/50">
@@ -128,149 +102,185 @@ export default function FiguresPage() {
     );
   }
 
-  if (!figures) {
-    return (
-      <div className="container mx-auto p-4 sm:p-6">
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">No figures data available</p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Complete call analyses to see your figures
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div>
-        <Link href="/dashboard/performance">
-          <Button variant="ghost" size="sm" className="mb-2">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Performance
-          </Button>
-        </Link>
-        <h1 className="text-2xl sm:text-3xl font-bold">Figures</h1>
-        <p className="text-sm sm:text-base text-muted-foreground mt-1">
-          Analytics automatically scraped from Call Analysis
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <Link href="/dashboard/performance">
+            <Button variant="ghost" size="sm" className="mb-2">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Performance
+            </Button>
+          </Link>
+          <h1 className="text-2xl sm:text-3xl font-bold">Figures</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
+            Month-by-month sales reality: booked, showed, qualified, closed, revenue
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Select value={month} onValueChange={setMonth}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Month" />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTHS.map((label, i) => (
+                <SelectItem key={label} value={String(i + 1).padStart(2, '0')}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+            <SelectTrigger className="w-[100px]">
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {/* Call Volume Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Phone className="h-5 w-5 text-primary" />
-              <CardTitle className="text-sm font-semibold">Total Calls Booked</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{figures.totalCallsBooked}</p>
-          </CardContent>
-        </Card>
+      {loading && figures && (
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      )}
 
-        <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
-              <CardTitle className="text-sm font-semibold">Total Calls Showed</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{figures.totalCallsShowed}</p>
-          </CardContent>
-        </Card>
+      {figures && (
+        <>
+          {/* Row 1 – Volume: Calls Booked, Showed, Qualified, Sales Made */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Phone className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-sm font-semibold">Total Calls Booked</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{figures.callsBooked}</p>
+                <p className="text-xs text-muted-foreground mt-1">For selected month</p>
+              </CardContent>
+            </Card>
+            <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  <CardTitle className="text-sm font-semibold">Total Calls Showed</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{figures.callsShowed}</p>
+                <p className="text-xs text-muted-foreground mt-1">For selected month</p>
+              </CardContent>
+            </Card>
+            <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-blue-500" />
+                  <CardTitle className="text-sm font-semibold">Total Calls Qualified</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{figures.callsQualified}</p>
+                <p className="text-xs text-muted-foreground mt-1">For selected month</p>
+              </CardContent>
+            </Card>
+            <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  <CardTitle className="text-sm font-semibold">Sales Made</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{figures.salesMade}</p>
+                <p className="text-xs text-muted-foreground mt-1">For selected month</p>
+              </CardContent>
+            </Card>
+          </div>
 
-        <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <XCircle className="h-5 w-5 text-red-500" />
-              <CardTitle className="text-sm font-semibold">Total Calls No-Show</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{figures.totalCallsNoShow}</p>
-          </CardContent>
-        </Card>
+          {/* Row 2 – Rates: Close Rate, Show Rate, Qualified Rate */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Close Rate</CardTitle>
+                <p className="text-xs text-muted-foreground">Sales Made ÷ Calls Showed</p>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{figures.closeRate}%</p>
+              </CardContent>
+            </Card>
+            <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Show Rate</CardTitle>
+                <p className="text-xs text-muted-foreground">Calls Showed ÷ Calls Booked</p>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{figures.showRate}%</p>
+              </CardContent>
+            </Card>
+            <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Qualified Rate</CardTitle>
+                <p className="text-xs text-muted-foreground">Calls Qualified ÷ Calls Showed</p>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{figures.qualifiedRate}%</p>
+              </CardContent>
+            </Card>
+          </div>
 
-        <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-blue-500" />
-              <CardTitle className="text-sm font-semibold">Total Calls Qualified</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{figures.totalCallsQualified}</p>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Row 3 – Revenue: Cash Collected, Revenue Generated, Cash Collected % */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-green-500" />
+                  <CardTitle className="text-sm font-semibold">Cash Collected</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">${(figures.cashCollected / 100).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-1">Amount actually collected (cents stored)</p>
+              </CardContent>
+            </Card>
+            <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-green-500" />
+                  <CardTitle className="text-sm font-semibold">Revenue Generated</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">${(figures.revenueGenerated / 100).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-1">Total value of deals (incl. payment plans)</p>
+              </CardContent>
+            </Card>
+            <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Cash Collected %</CardTitle>
+                <p className="text-xs text-muted-foreground">Cash Collected ÷ Revenue Generated</p>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{figures.cashCollectedPct}%</p>
+              </CardContent>
+            </Card>
+          </div>
 
-      {/* Rate Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">% of Close-Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{figures.closeRate}%</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">% of No-Show</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{figures.noShowRate}%</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">% of Qualified-Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{figures.qualifiedRate}%</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Outcome Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
-              <CardTitle className="text-sm font-semibold">Calls Closed</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{figures.callsClosed}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-white/10 bg-linear-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-xl">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-green-500" />
-              <CardTitle className="text-sm font-semibold">Revenue Generated</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">${figures.revenueGenerated.toLocaleString()}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          All numbers are automatically scraped from Call Analysis. These metrics are calculated from your analyzed sales calls.
-        </AlertDescription>
-      </Alert>
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Figures include analysed transcripts (when &quot;Add to sales figures&quot; is on) and manual call entries. Follow-up closes increase sales count but not call count.
+            </AlertDescription>
+          </Alert>
+        </>
+      )}
     </div>
   );
 }

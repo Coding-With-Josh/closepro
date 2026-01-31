@@ -59,6 +59,15 @@ export interface ProspectDifficultyAssessment {
   difficultyTier?: 'easy' | 'realistic' | 'hard' | 'elite' | 'near_impossible';
 }
 
+/** AI-suggested outcome for sales figures (when addToFigures is true) */
+export interface CallOutcomeSuggestion {
+  result?: 'no_show' | 'closed' | 'lost' | 'unqualified' | 'deposit';
+  qualified?: boolean;
+  cashCollected?: number; // cents
+  revenueGenerated?: number; // cents
+  reasonForOutcome?: string;
+}
+
 export interface CallAnalysisResult {
   overallScore: number; // 0-100
   
@@ -79,6 +88,9 @@ export interface CallAnalysisResult {
   
   // Prospect difficulty assessment (for contextualizing performance)
   prospectDifficulty?: ProspectDifficultyAssessment;
+  
+  // Optional outcome suggestion for sales figures (when analysisIntent is update_figures)
+  outcome?: CallOutcomeSuggestion;
 }
 
 /**
@@ -158,7 +170,31 @@ export async function analyzeCall(
       return normalizeAnalysis(analysis, offerCategory, customerStage);
     } catch (error: any) {
       console.error('Anthropic analysis error:', error);
-      throw new Error(`Analysis failed: ${error.message || 'Unknown error'}`);
+      const msg = error?.message ?? '';
+      const isCreditError = /credit|balance|too low|invalid_request|payment|upgrade/i.test(msg) || error?.status === 400;
+      // If Anthropic failed due to credits, try Groq as free-tier alternative
+      if (isCreditError && groq) {
+        try {
+          const response = await groq.chat.completions.create({
+            model: 'llama-3.3-70b-versatile',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: prompt },
+            ],
+            temperature: 0.3,
+            max_tokens: 8000,
+            response_format: { type: 'json_object' },
+          });
+          const content = response.choices[0]?.message?.content;
+          if (!content) throw new Error('No response from Groq');
+          let jsonText = content.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
+          const analysis = JSON.parse(jsonText) as CallAnalysisResult;
+          return normalizeAnalysis(analysis, offerCategory, customerStage);
+        } catch (groqError: any) {
+          console.error('Groq fallback error:', groqError);
+        }
+      }
+      throw new Error(`Analysis failed: ${msg || 'Unknown error'}`);
     }
   }
 
@@ -304,6 +340,13 @@ Return your analysis as JSON in this exact format:
     "executionResistance": 4,
     "totalDifficultyScore": 27,
     "difficultyTier": "elite"
+  },
+  "outcome": {
+    "result": "closed",
+    "qualified": true,
+    "cashCollected": 5000,
+    "revenueGenerated": 10000,
+    "reasonForOutcome": "Prospect agreed to purchase; deposit taken."
   }
 }`;
 }
@@ -364,6 +407,24 @@ function normalizeAnalysis(analysis: any, offerCategory?: 'b2c_health' | 'b2c_re
     }));
   }
 
+  // Normalize optional outcome suggestion
+  const validResults = ['no_show', 'closed', 'lost', 'unqualified', 'deposit'] as const;
+  let outcome: CallOutcomeSuggestion | undefined;
+  if (analysis.outcome && typeof analysis.outcome === 'object') {
+    const o = analysis.outcome as Record<string, unknown>;
+    const result = typeof o.result === 'string' && validResults.includes(o.result as any) ? o.result : undefined;
+    outcome = {
+      result,
+      qualified: typeof o.qualified === 'boolean' ? o.qualified : undefined,
+      cashCollected: typeof o.cashCollected === 'number' && o.cashCollected >= 0 ? Math.round(o.cashCollected) : undefined,
+      revenueGenerated: typeof o.revenueGenerated === 'number' && o.revenueGenerated >= 0 ? Math.round(o.revenueGenerated) : undefined,
+      reasonForOutcome: typeof o.reasonForOutcome === 'string' ? o.reasonForOutcome.trim().slice(0, 2000) : undefined,
+    };
+    if (!result && outcome.qualified === undefined && outcome.cashCollected === undefined && outcome.revenueGenerated === undefined && !outcome.reasonForOutcome) {
+      outcome = undefined;
+    }
+  }
+
   return {
     overallScore,
     value: valuePillar,
@@ -376,6 +437,7 @@ function normalizeAnalysis(analysis: any, offerCategory?: 'b2c_health' | 'b2c_re
       ? analysis.timestampedFeedback
       : [],
     prospectDifficulty,
+    outcome,
   };
 }
 

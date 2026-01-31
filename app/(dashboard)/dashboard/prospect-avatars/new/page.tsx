@@ -64,7 +64,7 @@ function NewProspectAvatarContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (!formData.name) {
       toastError('Please provide a name for this prospect avatar');
       return;
@@ -138,11 +138,11 @@ function NewProspectAvatarContent() {
       <div className="mb-4 sm:mb-6">
         {offerId && (
           <Link href={`/dashboard/offers/${offerId}`}>
-            <Button variant="ghost" size="sm" className="mb-2">
-              <ArrowLeft className="h-4 w-4 mr-2" />
+          <Button variant="ghost" size="sm" className="mb-2">
+            <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Offer
-            </Button>
-          </Link>
+          </Button>
+        </Link>
         )}
         <h1 className="text-2xl sm:text-3xl font-bold">Create Prospect Avatar</h1>
         <p className="text-sm sm:text-base text-muted-foreground mt-1">
@@ -154,7 +154,7 @@ function NewProspectAvatarContent() {
         <Card className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">Basic Information</h2>
-
+            
             <div className="space-y-2">
               <Label htmlFor="name">Prospect Name *</Label>
               <Input
@@ -412,10 +412,10 @@ function NewProspectAvatarContent() {
               </Link>
             ) : (
               <Link href="/dashboard/offers" className="flex-1">
-                <Button type="button" variant="outline" className="w-full">
-                  Cancel
-                </Button>
-              </Link>
+              <Button type="button" variant="outline" className="w-full">
+                Cancel
+              </Button>
+            </Link>
             )}
             <Button type="submit" disabled={loading} className="flex-1 w-full sm:w-auto">
               {loading ? (

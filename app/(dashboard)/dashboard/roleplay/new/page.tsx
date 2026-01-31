@@ -9,7 +9,7 @@ import { Plus, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
-import { Package } from 'lucide-react';
+import { EmptyOffersIllustration } from '@/components/illustrations';
 
 interface Offer {
   id: string;
@@ -111,8 +111,8 @@ export default function NewRoleplayPage() {
         <Card className="p-8 sm:p-12">
           <Empty>
             <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <Package className="size-6" />
+              <EmptyMedia variant="illustration" className="size-32">
+                <EmptyOffersIllustration className="size-full max-w-[8rem] max-h-[8rem]" />
               </EmptyMedia>
               <EmptyTitle>No offers yet</EmptyTitle>
               <EmptyDescription>Create your first offer to start a roleplay session</EmptyDescription>

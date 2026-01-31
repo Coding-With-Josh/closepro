@@ -9,7 +9,7 @@ if (!process.env.BETTER_AUTH_SECRET) {
 }
 
 if (!process.env.BETTER_AUTH_URL) {
-  throw new Error('BETTER_AUTH_URL environment variable is required. Set it to your production URL (e.g., https://close-pro.vercel.app)');
+  throw new Error('BETTER_AUTH_URL environment variable is required. For local dev use http://localhost:3000 (or your dev port); for production use your app URL (e.g. https://close-pro.vercel.app).');
 }
 
 export const auth = betterAuth({

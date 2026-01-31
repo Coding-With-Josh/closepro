@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Filter, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
+import { EmptyCallsIllustration } from '@/components/illustrations';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
@@ -133,7 +134,7 @@ export default function CallsPage() {
     const date = new Date(call.date);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const monthLabel = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    
+
     if (!acc[monthKey]) {
       acc[monthKey] = {
         label: monthLabel,
@@ -146,14 +147,14 @@ export default function CallsPage() {
 
   // Filter calls
   const filteredCalls = calls.filter((call) => {
-    const matchesSearch = 
+    const matchesSearch =
       call.offerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (call as any).notes?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesOfferType = offerTypeFilter === 'all' || call.offerType === offerTypeFilter;
     const matchesCallType = callTypeFilter === 'all' || call.callType === callTypeFilter;
     const matchesResult = resultFilter === 'all' || call.result === resultFilter;
-    const matchesDifficulty = 
-      difficultyFilter === 'all' || 
+    const matchesDifficulty =
+      difficultyFilter === 'all' ||
       call.difficultyTier === difficultyFilter;
 
     return matchesSearch && matchesOfferType && matchesCallType && matchesResult && matchesDifficulty;
@@ -164,7 +165,7 @@ export default function CallsPage() {
     const date = new Date(call.date);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const monthLabel = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    
+
     if (!acc[monthKey]) {
       acc[monthKey] = {
         label: monthLabel,
@@ -204,11 +205,16 @@ export default function CallsPage() {
     <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Calls</h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            View and manage your sales call history
-          </p>
+        <div className="flex items-start gap-4">
+          <div className="hidden sm:block shrink-0 w-14 h-14 text-muted-foreground/70">
+            <EmptyCallsIllustration className="w-full h-full" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold">Calls</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">
+              View and manage your sales call history
+            </p>
+          </div>
         </div>
         <Link href="/dashboard/calls/new">
           <Button>
@@ -294,8 +300,8 @@ export default function CallsPage() {
         <Card className="p-8 sm:p-12">
           <Empty>
             <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <Search className="size-6" />
+              <EmptyMedia variant="illustration" className="size-32">
+                <EmptyCallsIllustration className="size-full max-w-[8rem] max-h-[8rem]" />
               </EmptyMedia>
               <EmptyTitle>No calls found</EmptyTitle>
               <EmptyDescription>
@@ -348,10 +354,10 @@ export default function CallsPage() {
                 {sortedMonthKeys.map((monthKey) => {
                   const monthData = filteredGroupedCalls[monthKey];
                   const isExpanded = expandedMonths.has(monthKey);
-                  
+
                   return (
                     <React.Fragment key={monthKey}>
-                      <TableRow 
+                      <TableRow
                         className="cursor-pointer hover:bg-accent/50 bg-muted/30"
                         onClick={() => toggleMonth(monthKey)}
                       >

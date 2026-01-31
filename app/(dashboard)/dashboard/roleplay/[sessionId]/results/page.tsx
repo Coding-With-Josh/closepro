@@ -51,6 +51,8 @@ export default function RoleplayResultsPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(true);
+  const [scoringError, setScoringError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   const fetchResults = useCallback(async () => {
     try {
@@ -70,15 +72,18 @@ export default function RoleplayResultsPage() {
 
 
       if (data.session.status === 'completed' && !data.session.analysisId) {
-        // Session completed but not scored yet — score it now
+        // Session completed but not scored yet — try to score once
         const scoreResponse = await fetch(`/api/roleplay/${sessionId}/score`, {
           method: 'POST',
         });
+        const scoreData = await scoreResponse.json().catch(() => ({}));
         if (scoreResponse.ok) {
           const updatedResponse = await fetch(`/api/roleplay/${sessionId}`);
           const updatedData = await updatedResponse.json();
           setSession(updatedData.session);
           if (updatedData.analysis) setAnalysis(updatedData.analysis);
+        } else {
+          setScoringError(scoreData.error || 'Scoring failed');
         }
       }
     } catch (error) {
@@ -91,6 +96,24 @@ export default function RoleplayResultsPage() {
   useEffect(() => {
     fetchResults();
   }, [fetchResults]);
+
+  const handleRetryScoring = useCallback(async () => {
+    setScoringError(null);
+    setRetrying(true);
+    try {
+      const res = await fetch(`/api/roleplay/${sessionId}/score`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setScoringError(data.error || 'Scoring failed');
+        return;
+      }
+      const updated = await fetch(`/api/roleplay/${sessionId}`);
+      const updatedData = await updated.json();
+      if (updatedData.analysis) setAnalysis(updatedData.analysis);
+    } finally {
+      setRetrying(false);
+    }
+  }, [sessionId]);
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-500';
@@ -117,11 +140,25 @@ export default function RoleplayResultsPage() {
   if (!analysis) {
     return (
       <div className="container mx-auto p-4 sm:p-6">
-        <div className="text-center py-12">
-          <p className="text-muted-foreground mb-4">No analysis available yet</p>
-          <Link href={`/dashboard/roleplay/${sessionId}`}>
-            <Button>Back to Session</Button>
-          </Link>
+        <div className="text-center py-12 max-w-md mx-auto space-y-4">
+          <p className="text-muted-foreground">No analysis available yet.</p>
+          {scoringError && (
+            <p className="text-sm text-destructive bg-destructive/10 rounded-md p-3">{scoringError}</p>
+          )}
+          <p className="text-sm text-muted-foreground">
+            If scoring failed due to API credits, add credits in Plans & Billing or set GROQ_API_KEY in .env for a free-tier option.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button onClick={handleRetryScoring} disabled={retrying}>
+              {retrying ? 'Scoring…' : 'Retry scoring'}
+            </Button>
+            <Link href={`/dashboard/roleplay/${sessionId}`}>
+              <Button variant="outline">Back to Session</Button>
+            </Link>
+            <Link href="/dashboard/billing">
+              <Button variant="outline">Plans & Billing</Button>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -132,7 +169,30 @@ export default function RoleplayResultsPage() {
   const fitDetails = JSON.parse(analysis.fitDetails || '{}');
   const logisticsDetails = JSON.parse(analysis.logisticsDetails || '{}');
   const recommendations = JSON.parse(analysis.coachingRecommendations || '[]');
-  const skillScores = JSON.parse(analysis.skillScores || '{}');
+  // skillScores can be array (e.g. [{ category, subSkills }]) or object; normalize to list of { categoryName, skills: [name, score][] }
+  const rawSkillScores = (() => {
+    try {
+      return JSON.parse(analysis.skillScores || '[]');
+    } catch {
+      return [];
+    }
+  })();
+  const skillScoresList: { categoryName: string; skills: [string, number][] }[] = Array.isArray(rawSkillScores)
+    ? rawSkillScores.map((item: { category?: string; subSkills?: Record<string, number> }) => ({
+        categoryName: item.category ?? 'Category',
+        skills: Object.entries(item.subSkills ?? {}),
+      }))
+    : typeof rawSkillScores === 'object' && rawSkillScores !== null
+      ? Object.entries(rawSkillScores).map(([categoryName, val]) => {
+          const skills =
+            typeof val === 'object' && val !== null && !Array.isArray(val)
+              ? Object.entries(val as Record<string, number>).filter(
+                  ([, s]): s is number => typeof s === 'number'
+                ) as [string, number][]
+              : [];
+          return { categoryName, skills };
+        })
+      : [];
   const parsedTimestampedFeedback = (() => {
     try {
       const p = JSON.parse(analysis.timestampedFeedback || '[]');
@@ -450,25 +510,21 @@ export default function RoleplayResultsPage() {
       </div>
 
       {/* Skill Scores Breakdown */}
-      {Object.keys(skillScores).length > 0 && (
+      {skillScoresList.length > 0 && (
         <Card className="p-4 sm:p-6">
           <h2 className="text-xl font-semibold mb-4">10-Category Skill Breakdown</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.entries(skillScores as Record<string, Record<string, number> | number>).slice(0, 10).map(([category, scores]) => (
-              <div key={category} className="border rounded-lg p-3">
-                <h3 className="font-semibold mb-2 capitalize">{category.replace(/_/g, ' ')}</h3>
-                {typeof scores === 'object' && scores !== null ? (
-                  <div className="space-y-1">
-                    {Object.entries(scores).slice(0, 3).map(([skill, score]) => (
-                      <div key={skill} className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">{skill}</span>
-                        <span className="font-medium">{score}/100</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Score: {scores}/100</p>
-                )}
+            {skillScoresList.slice(0, 10).map(({ categoryName, skills }, idx) => (
+              <div key={idx} className="border rounded-lg p-3">
+                <h3 className="font-semibold mb-2 capitalize">{categoryName.replace(/_/g, ' ')}</h3>
+                <div className="space-y-1">
+                  {skills.slice(0, 5).map(([skill, score]) => (
+                    <div key={skill} className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{skill}</span>
+                      <span className="font-medium">{typeof score === 'number' ? `${score}/100` : '—'}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>

@@ -32,6 +32,7 @@ import { Progress } from '@/components/ui/progress';
 import { toastError, toastSuccess } from '@/lib/toast';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
+import { EmptyTeamIllustration } from '@/components/illustrations';
 
 interface TeamMember {
   id: string;
@@ -466,8 +467,8 @@ export default function TeamPage() {
           {data.members.length === 0 ? (
             <Empty>
               <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <Users className="size-6" />
+                <EmptyMedia variant="illustration" className="size-32">
+                  <EmptyTeamIllustration className="size-full max-w-[8rem] max-h-[8rem]" />
                 </EmptyMedia>
                 <EmptyTitle>No team members yet</EmptyTitle>
                 <EmptyDescription>Start building your team by inviting your first member</EmptyDescription>
