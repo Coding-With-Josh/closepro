@@ -221,20 +221,33 @@ export default function NewCallPage() {
 
   const handleTranscriptSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!transcriptText.trim()) {
-      toastError('Please paste or enter the transcript');
+    const hasText = transcriptText.trim().length > 0;
+    const hasFile = transcriptFile != null && transcriptFile.size > 0;
+    if (!hasText && !hasFile) {
+      toastError('Please paste transcript text or upload a .txt, .pdf, or .docx file');
       return;
     }
     setTranscriptSubmitting(true);
     try {
-      const response = await fetch('/api/calls/transcript', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transcript: transcriptText.trim(),
-          addToFigures: addToFiguresTranscript,
-        }),
-      });
+      let response: Response;
+      if (hasFile) {
+        const formData = new FormData();
+        formData.append('file', transcriptFile);
+        formData.append('metadata', JSON.stringify({ addToFigures: addToFiguresTranscript }));
+        response = await fetch('/api/calls/transcript', {
+          method: 'POST',
+          body: formData,
+        });
+      } else {
+        response = await fetch('/api/calls/transcript', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transcript: transcriptText.trim(),
+            addToFigures: addToFiguresTranscript,
+          }),
+        });
+      }
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to create call from transcript');
@@ -283,7 +296,7 @@ export default function NewCallPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="upload">Upload & Analyze</TabsTrigger>
-          <TabsTrigger value="transcript">Paste transcript</TabsTrigger>
+          <TabsTrigger value="transcript">Paste / upload transcript</TabsTrigger>
           <TabsTrigger value="manual">Manual Log</TabsTrigger>
           <TabsTrigger value="no-show">No-Show</TabsTrigger>
           <TabsTrigger value="follow-up">Follow-Up</TabsTrigger>
@@ -347,23 +360,44 @@ export default function NewCallPage() {
         <TabsContent value="transcript">
           <Card>
             <CardHeader>
-              <CardTitle>Paste transcript</CardTitle>
+              <CardTitle>Paste or upload transcript</CardTitle>
               <CardDescription>
-                Paste or type a call transcript for AI analysis. No audio file needed.
+                Paste text below or upload a .txt, .pdf, or Word (.docx) file. No audio needed.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleTranscriptSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="transcript-text">Transcript *</Label>
+                  <Label htmlFor="transcript-file">Upload transcript file</Label>
+                  <Input
+                    id="transcript-file"
+                    type="file"
+                    accept=".txt,.pdf,.doc,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    onChange={(e) => setTranscriptFile(e.target.files?.[0] ?? null)}
+                  />
+                  {transcriptFile && (
+                    <p className="text-sm text-muted-foreground">
+                      Selected: {transcriptFile.name} ({(transcriptFile.size / 1024).toFixed(1)} KB)
+                    </p>
+                  )}
+                </div>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">Or paste below</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="transcript-text">Paste transcript text</Label>
                   <Textarea
                     id="transcript-text"
                     value={transcriptText}
                     onChange={(e) => setTranscriptText(e.target.value)}
                     placeholder="Paste your call transcript here. You can use lines like [Speaker A] or Speaker 1: to separate speakers."
-                    rows={12}
+                    rows={10}
                     className="font-mono text-sm"
-                    required
                   />
                 </div>
                 <div className="flex items-center space-x-2">
@@ -382,7 +416,11 @@ export default function NewCallPage() {
                       Cancel
                     </Button>
                   </Link>
-                  <Button type="submit" disabled={transcriptSubmitting || !transcriptText.trim()} className="flex-1">
+                  <Button
+                    type="submit"
+                    disabled={transcriptSubmitting || (!transcriptText.trim() && !transcriptFile)}
+                    className="flex-1"
+                  >
                     {transcriptSubmitting ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />

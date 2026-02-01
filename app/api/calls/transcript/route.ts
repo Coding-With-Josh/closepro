@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { canPerformAction, incrementUsage } from '@/lib/subscription';
 import { shouldBypassSubscription } from '@/lib/dev-mode';
 import { analyzeCallAsync } from '@/lib/calls/analyze-call';
+import { extractTextFromTranscriptFile, isAllowedTranscriptFile } from '@/lib/calls/extract-transcript-text';
 
 /**
  * Build minimal transcriptJson from pasted transcript text.
@@ -37,8 +38,10 @@ function transcriptTextToJson(transcript: string): { utterances: Array<{ speaker
 }
 
 /**
- * POST - Create a call from pasted transcript (no audio/Deepgram).
- * Body: { transcript: string, addToFigures?: boolean, fileName?: string }
+ * POST - Create a call from pasted transcript or uploaded file (no audio/Deepgram).
+ * Accepts either:
+ * - JSON: { transcript: string, addToFigures?: boolean, fileName?: string }
+ * - FormData: file (TXT/PDF/DOCX) + optional metadata (JSON string with addToFigures)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -90,20 +93,71 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { transcript, addToFigures = true, fileName = 'pasted-transcript.txt' } = body;
+    const contentType = request.headers.get('content-type') ?? '';
+    let transcript: string;
+    let fileName: string;
+    let addToFigures = true;
 
-    if (typeof transcript !== 'string' || !transcript.trim()) {
-      return NextResponse.json(
-        { error: 'transcript (string) is required' },
-        { status: 400 }
-      );
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData();
+      const file = formData.get('file') as File | null;
+      const metadataStr = formData.get('metadata') as string | null;
+      if (!file || file.size === 0) {
+        return NextResponse.json(
+          { error: 'No file provided. Upload a .txt, .pdf, or .docx transcript file.' },
+          { status: 400 }
+        );
+      }
+      if (!isAllowedTranscriptFile(file.name, file.type)) {
+        return NextResponse.json(
+          { error: 'Unsupported file type. Use .txt, .pdf, or .docx.' },
+          { status: 400 }
+        );
+      }
+      try {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        transcript = await extractTextFromTranscriptFile(buffer, file.name, file.type);
+      } catch (extractErr: unknown) {
+        const msg = extractErr instanceof Error ? extractErr.message : 'Failed to extract text from file';
+        return NextResponse.json(
+          { error: msg },
+          { status: 400 }
+        );
+      }
+      if (!transcript.trim()) {
+        return NextResponse.json(
+          { error: 'File appears empty or no text could be extracted.' },
+          { status: 400 }
+        );
+      }
+      fileName = file.name;
+      if (metadataStr) {
+        try {
+          const meta = JSON.parse(metadataStr);
+          addToFigures = meta.addToFigures !== false;
+        } catch {
+          // ignore invalid metadata
+        }
+      }
+    } else {
+      const body = await request.json();
+      const { transcript: bodyTranscript, addToFigures: bodyAddToFigures = true, fileName: bodyFileName = 'pasted-transcript.txt' } = body;
+      if (typeof bodyTranscript !== 'string' || !bodyTranscript.trim()) {
+        return NextResponse.json(
+          { error: 'transcript (string) is required, or upload a .txt / .pdf / .docx file' },
+          { status: 400 }
+        );
+      }
+      transcript = bodyTranscript.trim();
+      fileName = typeof bodyFileName === 'string' ? bodyFileName : 'pasted-transcript.txt';
+      addToFigures = bodyAddToFigures !== false;
     }
 
     const transcriptJson = transcriptTextToJson(transcript);
     const analysisIntent = addToFigures ? 'update_figures' : 'analysis_only';
     const callMetadata = { addToFigures };
 
+    const trimmedTranscript = transcript.trim();
     const [call] = await db
       .insert(salesCalls)
       .values({
@@ -113,7 +167,7 @@ export async function POST(request: NextRequest) {
         fileUrl: '',
         fileSize: null,
         duration: null,
-        transcript: transcript.trim(),
+        transcript: trimmedTranscript,
         transcriptJson: JSON.stringify(transcriptJson),
         status: 'analyzing',
         metadata: JSON.stringify(callMetadata),
@@ -125,7 +179,7 @@ export async function POST(request: NextRequest) {
       await incrementUsage(organizationId, 'calls');
     }
 
-    analyzeCallAsync(call.id, transcript.trim(), transcriptJson).catch(
+    analyzeCallAsync(call.id, trimmedTranscript, transcriptJson).catch(
       (err) => console.error('Background analysis error (transcript):', err)
     );
 
