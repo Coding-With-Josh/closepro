@@ -68,6 +68,7 @@ export default function NewCallPage() {
 
   // Paste transcript form state
   const [transcriptText, setTranscriptText] = useState('');
+  const [transcriptFile, setTranscriptFile] = useState<File | null>(null);
   const [addToFiguresTranscript, setAddToFiguresTranscript] = useState(true);
   const [transcriptSubmitting, setTranscriptSubmitting] = useState(false);
 
