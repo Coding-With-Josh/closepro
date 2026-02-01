@@ -38,7 +38,6 @@ export default function NewCallPage() {
     revenueGenerated: '',
     depositTaken: false,
     reasonForOutcome: '',
-    objections: '',
   });
 
   // No-show form state
@@ -56,6 +55,7 @@ export default function NewCallPage() {
     originalCallId: '',
     followUpDate: new Date().toISOString().split('T')[0],
     outcome: '',
+    reasonForOutcome: '',
     cashCollected: '',
     revenueGenerated: '',
     depositTaken: false,
@@ -154,7 +154,7 @@ export default function NewCallPage() {
 
   const handleFollowUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!followUpForm.originalCallId || !followUpForm.outcome) {
+    if (!followUpForm.originalCallId || !followUpForm.outcome || !followUpForm.reasonForOutcome) {
       toastError('Please fill in all required fields');
       return;
     }
@@ -445,10 +445,15 @@ export default function NewCallPage() {
             <CardHeader>
               <CardTitle>Manual Call Log</CardTitle>
               <CardDescription>
-                Log a call manually when you don&apos;t have a recording. This updates figures but does not add to call history.
+                Log a call manually when you don&apos;t have a recording. This updates figures.
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {offers.length === 0 && (
+                <p className="text-sm text-muted-foreground mb-4">
+                  Create an offer first to log calls.
+                </p>
+              )}
               <form onSubmit={handleManualSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -528,12 +533,12 @@ export default function NewCallPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="manual-reason">Reason for Outcome *</Label>
+                  <Label htmlFor="manual-reason">Reason for outcome *</Label>
                   <Textarea
                     id="manual-reason"
                     value={manualForm.reasonForOutcome}
                     onChange={(e) => setManualForm({ ...manualForm, reasonForOutcome: e.target.value })}
-                    placeholder="Why did this call end this way?"
+                    placeholder="Why did this call end this way? What objections came up? How did we handle them?"
                     rows={3}
                     required
                   />
@@ -582,17 +587,6 @@ export default function NewCallPage() {
                     </div>
                   </div>
                 )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="manual-objections">What objections came up? (Optional)</Label>
-                  <Textarea
-                    id="manual-objections"
-                    value={manualForm.objections}
-                    onChange={(e) => setManualForm({ ...manualForm, objections: e.target.value })}
-                    placeholder="List any objections that came up during the call"
-                    rows={2}
-                  />
-                </div>
 
                 <div className="flex gap-3">
                   <Link href="/dashboard/calls" className="flex-1">
@@ -772,6 +766,18 @@ export default function NewCallPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="follow-up-reason">Reason for outcome *</Label>
+                  <Textarea
+                    id="follow-up-reason"
+                    value={followUpForm.reasonForOutcome}
+                    onChange={(e) => setFollowUpForm({ ...followUpForm, reasonForOutcome: e.target.value })}
+                    placeholder="Why did this call end this way? What objections came up? How did we handle them?"
+                    rows={3}
+                    required
+                  />
                 </div>
 
                 {followUpForm.outcome === 'sale_made' && (

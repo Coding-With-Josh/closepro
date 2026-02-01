@@ -26,14 +26,15 @@ export async function POST(request: NextRequest) {
       originalCallId,
       followUpDate,
       outcome,
+      reasonForOutcome,
       cashCollected,
       revenueGenerated,
       depositTaken,
     } = body;
 
-    if (!originalCallId || !outcome) {
+    if (!originalCallId || !outcome || !reasonForOutcome) {
       return NextResponse.json(
-        { error: 'Missing required fields: originalCallId, outcome' },
+        { error: 'Missing required fields: originalCallId, outcome, reasonForOutcome' },
         { status: 400 }
       );
     }
@@ -92,21 +93,23 @@ export async function POST(request: NextRequest) {
 
     const result = resultMap[outcome] || 'follow_up';
 
-    // Create follow-up record
-    // Note: Follow-ups do NOT increase total call count, but can increase sales + close rate
+    // Create follow-up record; callDate and analysisIntent so it feeds figures in the correct month
     const [followUpCall] = await db
       .insert(salesCalls)
       .values({
         organizationId,
         userId: session.user.id,
         fileName: `follow-up-${followUpDate}`,
-        fileUrl: '', // No file for manual follow-ups
+        fileUrl: '',
         status: 'completed',
         offerId: originalCall[0].offerId,
         offerType: originalCall[0].offerType,
         callType: 'follow_up' as any,
         result: result as any,
         originalCallId,
+        reasonForOutcome: reasonForOutcome || null,
+        callDate: new Date(followUpDate),
+        analysisIntent: 'update_figures',
         cashCollected: cashCollected || null,
         revenueGenerated: revenueGenerated || null,
         depositTaken: depositTaken || false,

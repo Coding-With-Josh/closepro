@@ -120,14 +120,14 @@ function NewProspectAvatarContent() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create avatar');
+        const data = await response.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error || 'Failed to create avatar');
       }
 
       router.push(`/dashboard/offers/${offerId}`);
     } catch (error: unknown) {
       console.error('Error creating avatar:', error);
-      toastError('Failed to create avatar: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      toastError(error instanceof Error ? error.message : 'Failed to create avatar');
     } finally {
       setLoading(false);
     }

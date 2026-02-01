@@ -119,6 +119,10 @@ export async function canPerformAction(
     if (org[0].trialEndsAt && new Date(org[0].trialEndsAt) > new Date()) {
       return { allowed: true };
     }
+    // Allow upload_call (transcript + audio) when no subscription so testing/demo works without a paid plan
+    if (action === 'upload_call') {
+      return { allowed: true };
+    }
     return { allowed: false, reason: 'No active subscription' };
   }
 

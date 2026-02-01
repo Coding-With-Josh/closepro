@@ -99,24 +99,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert file to buffer for transcription
-    const arrayBuffer = await file.arrayBuffer();
-    const audioBuffer = Buffer.from(arrayBuffer);
-
-    // Transcribe audio (Deepgram is fast, completes in seconds)
-    let transcriptionResult;
-    try {
-      transcriptionResult = await transcribeAudioFile(audioBuffer, file.name);
-    } catch (transcriptionError: unknown) {
-      console.error('Transcription error:', transcriptionError);
-      const msg = transcriptionError instanceof Error ? transcriptionError.message : 'Transcription failed';
-      const isConfig = typeof msg === 'string' && (msg.includes('configured') || msg.includes('API') || msg.includes('key'));
-      return NextResponse.json(
-        { error: isConfig ? `Transcription not available: ${msg}. Set DEEPGRAM_API_KEY or ASSEMBLYAI_API_KEY.` : `Transcription failed: ${msg}` },
-        { status: 500 }
-      );
-    }
-
     // Store metadata; addToFigures (default true) controls whether this call counts in figures
     let callMetadata: Record<string, unknown> = {};
     try {
@@ -127,39 +109,41 @@ export async function POST(request: NextRequest) {
     const addToFigures = callMetadata.addToFigures !== false;
     const analysisIntent = addToFigures ? 'update_figures' : 'analysis_only';
 
-    // Create call record with transcript ready
+    // Create call record immediately with status 'transcribing' so UI never freezes
+    const arrayBuffer = await file.arrayBuffer();
+    const audioBuffer = Buffer.from(arrayBuffer);
+
     const [call] = await db
       .insert(salesCalls)
       .values({
         organizationId,
         userId: session.user.id,
         fileName: file.name,
-        fileUrl: '', // Not storing URL anymore
+        fileUrl: '',
         fileSize: file.size,
-        transcript: transcriptionResult.transcript,
-        transcriptJson: JSON.stringify(transcriptionResult.transcriptJson),
-        duration: transcriptionResult.duration,
-        status: 'analyzing', // Ready for analysis immediately
+        transcript: null,
+        transcriptJson: null,
+        duration: null,
+        status: 'transcribing',
         metadata: JSON.stringify(callMetadata),
         analysisIntent,
       })
       .returning();
 
-    // Increment usage counter (skip in dev mode)
     if (!shouldBypassSubscription()) {
       await incrementUsage(organizationId, 'calls');
     }
 
-    // Trigger analysis in background (non-blocking)
-    analyzeCallAsync(call.id, transcriptionResult.transcript, transcriptionResult.transcriptJson).catch(
-      (err) => console.error('Background analysis error:', err)
+    // Run transcription then analysis in background (non-blocking)
+    transcribeAndAnalyzeAsync(call.id, audioBuffer, file.name, analysisIntent).catch(
+      (err) => console.error('Background transcribe/analyze error:', err)
     );
 
     return NextResponse.json({
       callId: call.id,
-      status: 'analyzing',
-      message: 'Call uploaded and transcribed. Analysis in progress...',
-    });
+      status: 'transcribing',
+      message: 'Upload received. Transcription in progress...',
+    }, { status: 201 });
   } catch (error: unknown) {
     console.error('Error uploading call:', error);
     let msg = error instanceof Error ? error.message : 'Failed to upload call';
@@ -171,4 +155,42 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Background: transcribe audio, update call row, then run analysis.
+ */
+async function transcribeAndAnalyzeAsync(
+  callId: string,
+  audioBuffer: Buffer,
+  fileName: string,
+  analysisIntent: string
+): Promise<void> {
+  let transcriptionResult;
+  try {
+    transcriptionResult = await transcribeAudioFile(audioBuffer, fileName);
+  } catch (err: unknown) {
+    console.error('Background transcription error:', err);
+    await db
+      .update(salesCalls)
+      .set({ status: 'failed' })
+      .where(eq(salesCalls.id, callId));
+    return;
+  }
+
+  await db
+    .update(salesCalls)
+    .set({
+      transcript: transcriptionResult.transcript,
+      transcriptJson: JSON.stringify(transcriptionResult.transcriptJson),
+      duration: transcriptionResult.duration,
+      status: 'analyzing',
+    })
+    .where(eq(salesCalls.id, callId));
+
+  await analyzeCallAsync(
+    callId,
+    transcriptionResult.transcript,
+    transcriptionResult.transcriptJson
+  );
 }
