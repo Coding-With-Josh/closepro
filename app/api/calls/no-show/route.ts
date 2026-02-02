@@ -69,10 +69,15 @@ export async function POST(request: NextRequest) {
       organizationId = firstOrg[0].organizationId;
     }
 
-    // Create a no-show record
-    // Note: This should update booked calls, no-show rate, and funnel diagnostics
-    // For now, we'll create a minimal record
-    
+    // Use selected date for figures month attribution (so January no-show shows in January)
+    const callDate = date ? new Date(date) : new Date();
+    if (isNaN(callDate.getTime())) {
+      return NextResponse.json(
+        { error: 'Invalid date' },
+        { status: 400 }
+      );
+    }
+
     const [noShowCall] = await db
       .insert(salesCalls)
       .values({
@@ -88,7 +93,8 @@ export async function POST(request: NextRequest) {
         wasConfirmed,
         bookingSource,
         metadata: notes ? JSON.stringify({ notes }) : null,
-        completedAt: new Date(date),
+        completedAt: callDate,
+        callDate,
       })
       .returning();
 

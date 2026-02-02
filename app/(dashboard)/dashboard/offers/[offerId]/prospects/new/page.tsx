@@ -15,6 +15,7 @@ import { Loader2, ArrowLeft, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { toastError, toastSuccess } from '@/lib/toast';
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
+import { calculateDifficultyIndex } from '@/lib/ai/roleplay/prospect-avatar';
 
 export default function NewProspectPage() {
   const router = useRouter();
