@@ -106,6 +106,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Qualified from result: closed/lost → qualified; unqualified → not qualified
+    const qualifiedFromResult = result === 'closed' || result === 'lost' ? true : result === 'unqualified' ? false : (qualified ?? null);
+
     await db.insert(salesCalls).values({
       organizationId,
       userId: session.user.id,
@@ -116,7 +119,7 @@ export async function POST(request: NextRequest) {
       offerType: offerType && validOfferTypes.includes(offerType) ? offerType : null,
       callType: callType && validCallTypes.includes(callType) ? callType : null,
       result,
-      qualified: qualified ?? null,
+      qualified: qualifiedFromResult,
       cashCollected: cashCollected != null ? Number(cashCollected) : null,
       revenueGenerated: revenueGenerated != null ? Number(revenueGenerated) : null,
       depositTaken: depositTaken ?? null,

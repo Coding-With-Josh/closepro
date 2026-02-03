@@ -7,7 +7,6 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { toastError } from '@/lib/toast';
@@ -18,12 +17,15 @@ export default function EditProspectAvatarPage() {
   const avatarId = params.avatarId as string;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Authority Level / Perceived Need = one score 1–10 (1–3 Advisor, 4–7 Peer, 8–10 Advisee)
+  const authorityFromScore = (score: number): 'advisee' | 'peer' | 'advisor' =>
+    score <= 3 ? 'advisor' : score <= 7 ? 'peer' : 'advisee';
+
   const [formData, setFormData] = useState({
     name: '',
     positionProblemAlignment: 5,
     painAmbitionIntensity: 5,
-    perceivedNeedForHelp: 5,
-    authorityLevel: 'peer' as 'advisee' | 'peer' | 'advisor',
+    authorityPerceivedScore: 5,
     funnelContext: 5,
     positionDescription: '',
   });
@@ -39,12 +41,14 @@ export default function EditProspectAvatarPage() {
       const data = await response.json();
       const avatar = data.avatar;
       
+      const p = avatar.perceivedNeedForHelp;
+      const a = avatar.authorityLevel;
+      const score = typeof p === 'number' ? p : a === 'advisor' ? 2 : a === 'peer' ? 5 : 9;
       setFormData({
         name: avatar.name || '',
         positionProblemAlignment: avatar.positionProblemAlignment || 5,
         painAmbitionIntensity: avatar.painAmbitionIntensity || 5,
-        perceivedNeedForHelp: avatar.perceivedNeedForHelp || 5,
-        authorityLevel: avatar.authorityLevel || 'peer',
+        authorityPerceivedScore: score,
         funnelContext: avatar.funnelContext || 5,
         positionDescription: avatar.positionDescription || '',
       });
@@ -67,10 +71,20 @@ export default function EditProspectAvatarPage() {
 
     setSaving(true);
     try {
+      const perceivedNeedForHelp = formData.authorityPerceivedScore;
+      const authorityLevel = authorityFromScore(perceivedNeedForHelp);
       const response = await fetch(`/api/prospect-avatars/${avatarId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          name: formData.name,
+          positionProblemAlignment: formData.positionProblemAlignment,
+          painAmbitionIntensity: formData.painAmbitionIntensity,
+          perceivedNeedForHelp,
+          authorityLevel,
+          funnelContext: formData.funnelContext,
+          positionDescription: formData.positionDescription,
+        }),
       });
 
       if (!response.ok) {
@@ -173,17 +187,20 @@ export default function EditProspectAvatarPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="perceivedNeedForHelp">
-                  Perceived Need for Help: {formData.perceivedNeedForHelp}/10
+                <Label htmlFor="authorityPerceivedScore">
+                  Authority Level / Perceived Need for Help: {formData.authorityPerceivedScore}/10
                 </Label>
                 <input
                   type="range"
-                  min="0"
+                  min="1"
                   max="10"
-                  value={formData.perceivedNeedForHelp}
-                  onChange={(e) => setFormData({ ...formData, perceivedNeedForHelp: parseInt(e.target.value) })}
+                  value={formData.authorityPerceivedScore}
+                  onChange={(e) => setFormData({ ...formData, authorityPerceivedScore: parseInt(e.target.value) })}
                   className="w-full"
                 />
+                <p className="text-xs text-muted-foreground">
+                  1–3 Advisor, 4–7 Peer, 8–10 Advisee
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -199,25 +216,6 @@ export default function EditProspectAvatarPage() {
                   className="w-full"
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="authorityLevel">Authority Level</Label>
-              <Select
-                value={formData.authorityLevel}
-                onValueChange={(value: 'advisee' | 'peer' | 'advisor') => 
-                  setFormData({ ...formData, authorityLevel: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="advisee">Advisee (Open, deferential)</SelectItem>
-                  <SelectItem value="peer">Peer (Reserved, evaluative)</SelectItem>
-                  <SelectItem value="advisor">Advisor (Challenges, teaches)</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
 

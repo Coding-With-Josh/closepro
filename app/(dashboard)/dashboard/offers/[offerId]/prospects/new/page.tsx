@@ -25,13 +25,16 @@ export default function NewProspectPage() {
   const [uploadingTranscript, setUploadingTranscript] = useState(false);
   const [offer, setOffer] = useState<any>(null);
 
+  // Authority Level / Perceived Need = one score 1–10 (1–3 Advisor, 4–7 Peer, 8–10 Advisee)
+  const authorityFromScore = (score: number): 'advisee' | 'peer' | 'advisor' =>
+    score <= 3 ? 'advisor' : score <= 7 ? 'peer' : 'advisee';
+
   // Slider-based form data (0-10 for each dimension)
   const [formData, setFormData] = useState({
     name: '',
     positionProblemAlignment: 5,
     painAmbitionIntensity: 5,
-    perceivedNeedForHelp: 5,
-    authorityLevel: 'peer' as 'advisee' | 'peer' | 'advisor',
+    authorityPerceivedScore: 5, // Single 1–10: Authority Level / Perceived Need for Help
     funnelContext: 5,
     executionResistance: 5,
     positionDescription: '',
@@ -58,24 +61,18 @@ export default function NewProspectPage() {
     }
   };
 
-  // Calculate difficulty in real-time
+  // Calculate difficulty in real-time (authorityPerceivedScore = perceivedNeedForHelp; authorityLevel derived)
   const calculateDifficulty = () => {
-    let authorityScore = formData.perceivedNeedForHelp;
-    if (formData.authorityLevel === 'advisor') {
-      authorityScore = Math.max(0, authorityScore - 3);
-    } else if (formData.authorityLevel === 'peer') {
-      authorityScore = Math.max(0, authorityScore - 1);
-    }
-
+    const perceivedNeedForHelp = formData.authorityPerceivedScore;
+    const authorityLevel = authorityFromScore(perceivedNeedForHelp);
     const { index, tier } = calculateDifficultyIndex(
       formData.positionProblemAlignment,
       formData.painAmbitionIntensity,
-      formData.perceivedNeedForHelp,
-      formData.authorityLevel,
+      perceivedNeedForHelp,
+      authorityLevel,
       formData.funnelContext,
       formData.executionResistance
     );
-
     return { index, tier };
   };
 
@@ -108,18 +105,13 @@ export default function NewProspectPage() {
 
     setLoading(true);
     try {
-      let authorityScore = formData.perceivedNeedForHelp;
-      if (formData.authorityLevel === 'advisor') {
-        authorityScore = Math.max(0, authorityScore - 3);
-      } else if (formData.authorityLevel === 'peer') {
-        authorityScore = Math.max(0, authorityScore - 1);
-      }
-
+      const perceivedNeedForHelp = formData.authorityPerceivedScore;
+      const authorityLevel = authorityFromScore(perceivedNeedForHelp);
       const { index: difficultyIndex, tier: difficultyTier } = calculateDifficultyIndex(
         formData.positionProblemAlignment,
         formData.painAmbitionIntensity,
-        formData.perceivedNeedForHelp,
-        formData.authorityLevel,
+        perceivedNeedForHelp,
+        authorityLevel,
         formData.funnelContext,
         formData.executionResistance
       );
@@ -132,8 +124,8 @@ export default function NewProspectPage() {
           name: formData.name,
           positionProblemAlignment: formData.positionProblemAlignment,
           painAmbitionIntensity: formData.painAmbitionIntensity,
-          perceivedNeedForHelp: formData.perceivedNeedForHelp,
-          authorityLevel: formData.authorityLevel,
+          perceivedNeedForHelp,
+          authorityLevel,
           funnelContext: formData.funnelContext,
           executionResistance: formData.executionResistance,
           positionDescription: formData.positionDescription,
@@ -187,12 +179,14 @@ export default function NewProspectPage() {
       
       // Auto-populate form with extracted data
       if (extractData.avatar) {
+        const p = extractData.avatar.perceivedNeedForHelp;
+        const a = extractData.avatar.authorityLevel;
+        const score = typeof p === 'number' ? p : a === 'advisor' ? 2 : a === 'peer' ? 5 : 9;
         setFormData({
           name: extractData.avatar.name || '',
           positionProblemAlignment: extractData.avatar.positionProblemAlignment || 5,
           painAmbitionIntensity: extractData.avatar.painAmbitionIntensity || 5,
-          perceivedNeedForHelp: extractData.avatar.perceivedNeedForHelp || 5,
-          authorityLevel: extractData.avatar.authorityLevel || 'peer',
+          authorityPerceivedScore: score,
           funnelContext: extractData.avatar.funnelContext || 5,
           executionResistance: extractData.avatar.executionResistance || 5,
           positionDescription: extractData.avatar.positionDescription || '',
@@ -384,40 +378,18 @@ export default function NewProspectPage() {
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label>Perceived Need for Help</Label>
-                      <span className="text-sm font-medium">{formData.perceivedNeedForHelp}/10</span>
+                      <Label>Authority Level / Perceived Need for Help</Label>
+                      <span className="text-sm font-medium">{formData.authorityPerceivedScore}/10</span>
                     </div>
                     <Slider
-                      value={[formData.perceivedNeedForHelp]}
-                      onValueChange={(value) => setFormData({ ...formData, perceivedNeedForHelp: value[0] })}
-                      min={0}
+                      value={[formData.authorityPerceivedScore]}
+                      onValueChange={(value) => setFormData({ ...formData, authorityPerceivedScore: value[0] })}
+                      min={1}
                       max={10}
                       step={1}
                     />
                     <p className="text-xs text-muted-foreground">
-                      How aware is the prospect that they need external help?
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Authority Level</Label>
-                    <Select
-                      value={formData.authorityLevel}
-                      onValueChange={(value: 'advisee' | 'peer' | 'advisor') => 
-                        setFormData({ ...formData, authorityLevel: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="advisee">Advisee (Low authority – easy)</SelectItem>
-                        <SelectItem value="peer">Peer (Medium authority)</SelectItem>
-                        <SelectItem value="advisor">Advisor (High authority – difficult)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      How does the prospect see themselves relative to the closer?
+                      1–3 Advisor (high authority), 4–7 Peer, 8–10 Advisee (low authority / high perceived need).
                     </p>
                   </div>
 

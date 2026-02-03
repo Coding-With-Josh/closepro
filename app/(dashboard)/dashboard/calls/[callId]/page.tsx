@@ -342,7 +342,14 @@ export default function CallDetailPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="outcome-result">Result</Label>
-                    <Select value={editResult || undefined} onValueChange={setEditResult}>
+                    <Select
+                      value={editResult || undefined}
+                      onValueChange={(value) => {
+                        setEditResult(value);
+                        const qualified = value === 'closed' || value === 'lost' ? true : value === 'unqualified' ? false : editQualified;
+                        setEditQualified(qualified);
+                      }}
+                    >
                       <SelectTrigger id="outcome-result">
                         <SelectValue placeholder="Select result" />
                       </SelectTrigger>
@@ -359,7 +366,7 @@ export default function CallDetailPage() {
                       checked={editQualified}
                       onCheckedChange={(v) => setEditQualified(v === true)}
                     />
-                    <Label htmlFor="outcome-qualified">Qualified</Label>
+                    <Label htmlFor="outcome-qualified">Qualified (closed/lost = yes, unqualified = no)</Label>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

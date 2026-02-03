@@ -154,7 +154,6 @@ export async function POST(request: NextRequest) {
     }
 
     const transcriptJson = transcriptTextToJson(transcript);
-    const analysisIntent = addToFigures ? 'update_figures' : 'analysis_only';
     const callMetadata = { addToFigures };
 
     const trimmedTranscript = transcript.trim();
@@ -164,6 +163,7 @@ export async function POST(request: NextRequest) {
     let callId: string;
 
     try {
+      // Minimal insert: only columns that exist in base schema so transcript works before migrations
       const [call] = await db
         .insert(salesCalls)
         .values({
@@ -177,7 +177,6 @@ export async function POST(request: NextRequest) {
           transcriptJson: transcriptJsonStr,
           status: 'analyzing',
           metadata: metadataStr,
-          analysisIntent,
         })
         .returning();
 
@@ -188,17 +187,18 @@ export async function POST(request: NextRequest) {
       const msg = typeof err?.message === 'string' ? err.message : '';
       const isMissingColumn = code === '42703' || (msg.includes('does not exist') && msg.includes('column'));
       if (isMissingColumn) {
-        // DB missing columns (e.g. offer_id, analysis_intent) – insert only base columns from migration 0000
-        const rows = await db.execute<{ id: string }>(sql`
+        const result = await db.execute<{ id: string }>(sql`
           INSERT INTO sales_calls (organization_id, user_id, file_name, file_url, file_size, duration, transcript, transcript_json, status, metadata)
           VALUES (${organizationId}, ${session.user.id}, ${fileName}, '', null, null, ${trimmedTranscript}, ${transcriptJsonStr}, 'analyzing', ${metadataStr})
           RETURNING id
         `);
-        const row = Array.isArray(rows) ? rows[0] : (rows as { rows?: { id: string }[] })?.rows?.[0];
-        if (!row?.id) {
+        const rows = Array.isArray(result) ? result : (result as { rows?: { id: string }[] })?.rows ?? [];
+        const row = Array.isArray(rows) ? rows[0] : (rows as { id?: string }[])?.[0];
+        const id = row && typeof row === 'object' && 'id' in row ? (row as { id: string }).id : undefined;
+        if (!id) {
           throw new Error('Database schema is out of date. Run: npm run db:migrate');
         }
-        callId = row.id;
+        callId = id;
       } else {
         throw insertError;
       }

@@ -517,7 +517,10 @@ export default function NewCallPage() {
                     <Label htmlFor="manual-result">Result *</Label>
                     <Select
                       value={manualForm.result}
-                      onValueChange={(value) => setManualForm({ ...manualForm, result: value })}
+                      onValueChange={(value) => {
+                        const qualified = value === 'closed' || value === 'lost' ? true : value === 'unqualified' ? false : manualForm.qualified;
+                        setManualForm({ ...manualForm, result: value, qualified });
+                      }}
                       required
                     >
                       <SelectTrigger>
@@ -531,6 +534,27 @@ export default function NewCallPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Closed or Lost = qualified; Unqualified = not qualified.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="manual-qualified">Qualified</Label>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="manual-qualified"
+                      checked={manualForm.qualified}
+                      onCheckedChange={(checked) => setManualForm({ ...manualForm, qualified: checked === true })}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {manualForm.result === 'closed' || manualForm.result === 'lost'
+                        ? 'Yes (set from result)'
+                        : manualForm.result === 'unqualified'
+                          ? 'No (set from result)'
+                          : 'Qualified lead'}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -543,17 +567,6 @@ export default function NewCallPage() {
                     rows={3}
                     required
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="manual-qualified"
-                      checked={manualForm.qualified}
-                      onCheckedChange={(checked) => setManualForm({ ...manualForm, qualified: checked === true })}
-                    />
-                    <Label htmlFor="manual-qualified">Qualified</Label>
-                  </div>
                 </div>
 
                 {manualForm.result === 'closed' && (
