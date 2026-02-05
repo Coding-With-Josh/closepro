@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Turbopack config for dev mode (Next.js 16+)
+  turbopack: {},
+  // Webpack config for production builds (Vercel uses webpack)
   webpack: (config, { isServer }) => {
     if (isServer) {
       // Exclude browser-only APIs from server bundles
